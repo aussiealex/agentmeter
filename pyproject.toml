@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentmeter"
+version = "0.1.0"
+description = "The missing economics layer for MCP agents. Meter every tool call."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "mcp>=1.0",
+    "click>=8.0",
+    "anyio>=4.0",
+]
+
+[project.scripts]
+agentmeter = "agentmeter.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentmeter"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "PLW"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
