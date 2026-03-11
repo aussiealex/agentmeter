@@ -21,6 +21,13 @@ agentmeter = "agentmeter.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentmeter"]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "anyio[trio]>=4.0",
+    "pytest-anyio>=0.0.0",
+]
+
 [tool.ruff]
 target-version = "py311"
 src = ["src"]

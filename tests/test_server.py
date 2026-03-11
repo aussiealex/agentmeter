@@ -18,9 +18,11 @@ def echo(message: str):
 
 
 @mcp.tool(description="Deliberately fail.")
-def fail():
+def fail() -> str:
     """Always errors."""
-    raise ValueError("This tool always fails")
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    raise ToolError("This tool always fails")
 
 
 if __name__ == "__main__":

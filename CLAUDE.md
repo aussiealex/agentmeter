@@ -129,7 +129,7 @@ ProtonMail Bridge for email search.
 ## Strategy Document
 
 Full business strategy is at:
-`/media/aa/LargeBackup/MainApps/MailSift/reports/agent-economics-strategy.html`
+`/media/aa/LargeBackup/MainApps/AgentMeter/reports/agent-economics-strategy.html`
 
 ## Constraints
 
