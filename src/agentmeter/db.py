@@ -20,6 +20,7 @@ def _default_db_path() -> Path:
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS session (
     id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL DEFAULT '',
     server_name     TEXT NOT NULL,
     server_command  TEXT NOT NULL,
     started_at      TEXT NOT NULL,
@@ -59,7 +60,19 @@ class MeterDB:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns that may be missing from older databases."""
+        columns = {
+            r[1]
+            for r in self._conn.execute("PRAGMA table_info(session)").fetchall()
+        }
+        if "name" not in columns:
+            self._conn.execute(
+                "ALTER TABLE session ADD COLUMN name TEXT NOT NULL DEFAULT ''"
+            )
 
     def close(self) -> None:
         self._conn.close()
@@ -78,11 +91,71 @@ class MeterDB:
         self._conn.commit()
 
     def end_session(self, session_id: str, total_calls: int) -> None:
+        name = self._generate_session_name(session_id, total_calls)
         self._conn.execute(
-            "UPDATE session SET ended_at = ?, total_calls = ? WHERE id = ?",
-            (datetime.now().isoformat(), total_calls, session_id),
+            "UPDATE session SET ended_at = ?, total_calls = ?, name = ? "
+            "WHERE id = ?",
+            (datetime.now().isoformat(), total_calls, name, session_id),
         )
         self._conn.commit()
+
+    def rename_session(self, session_id: str, name: str) -> bool:
+        """Rename a session. Returns True if the session was found."""
+        cursor = self._conn.execute(
+            "UPDATE session SET name = ? WHERE id = ? OR name = ?",
+            (name, session_id, session_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def _generate_session_name(
+        self, session_id: str, total_calls: int,
+    ) -> str:
+        """Generate a human-readable session name from activity."""
+        # Get server name
+        row = self._conn.execute(
+            "SELECT server_name, started_at FROM session WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return session_id
+        server = row["server_name"]
+        started = row["started_at"]
+
+        # Get top tools used (up to 2)
+        top_tools = self._conn.execute(
+            "SELECT tool_name, COUNT(*) as cnt FROM tool_call "
+            "WHERE session_id = ? GROUP BY tool_name "
+            "ORDER BY cnt DESC LIMIT 2",
+            (session_id,),
+        ).fetchall()
+
+        # Build name: server-tools-count
+        # e.g. "mailsift-search+fetch-12calls"
+        parts = [server]
+
+        if top_tools:
+            tool_names = "+".join(r["tool_name"] for r in top_tools)
+            parts.append(tool_names)
+
+        parts.append(f"{total_calls}calls")
+
+        # Add time context from started_at
+        try:
+            hour = int(started[:13].split("T")[1]) if "T" in started else 0
+        except (IndexError, ValueError):
+            hour = 0
+
+        if 5 <= hour < 12:
+            parts.insert(1, "morning")
+        elif 12 <= hour < 17:
+            parts.insert(1, "afternoon")
+        elif 17 <= hour < 21:
+            parts.insert(1, "evening")
+        else:
+            parts.insert(1, "night")
+
+        return "-".join(parts)
 
     # ── Tool call operations ────────────────────────────────────────
 
@@ -161,7 +234,7 @@ class MeterDB:
         where = f"WHERE s.started_at >= '{since}'" if since else ""
 
         sessions = self._conn.execute(
-            f"SELECT s.id, s.server_name, s.started_at, s.total_calls, "
+            f"SELECT s.id, s.name, s.server_name, s.started_at, s.total_calls, "
             f"COALESCE(SUM(tc.is_error), 0) as total_errors, "
             f"COALESCE(SUM(tc.elapsed_ms), 0) as total_elapsed_ms "
             f"FROM session s "
@@ -201,6 +274,7 @@ class MeterDB:
             results.append(
                 SessionStats(
                     session_id=s["id"],
+                    session_name=s["name"] or s["id"],
                     server_name=s["server_name"],
                     started_at=s["started_at"],
                     total_calls=s["total_calls"] or 0,

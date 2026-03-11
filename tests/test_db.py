@@ -146,6 +146,67 @@ class TestToolStats:
         assert len(stats_empty) == 0
 
 
+class TestSessionNaming:
+    def test_auto_name_on_end(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        _make_call(tmp_db, tool_name="search")
+        _make_call(tmp_db, tool_name="search")
+        _make_call(tmp_db, tool_name="fetch")
+        tmp_db.end_session("sess-001", total_calls=3)
+
+        stats = tmp_db.get_session_stats()
+        name = stats[0].session_name
+        assert "test" in name
+        assert "search" in name
+        assert "3calls" in name
+
+    def test_auto_name_includes_time_of_day(self, tmp_db: MeterDB) -> None:
+        session = Session(
+            id="sess-morning",
+            server_name="myserver",
+            server_command="python -m test",
+            started_at="2026-03-11T09:30:00",
+        )
+        tmp_db.create_session(session)
+        _make_call(tmp_db, session_id="sess-morning", tool_name="add")
+        tmp_db.end_session("sess-morning", total_calls=1)
+
+        stats = tmp_db.get_session_stats()
+        assert "morning" in stats[0].session_name
+
+    def test_rename_session(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        _make_call(tmp_db, tool_name="add")
+        tmp_db.end_session("sess-001", total_calls=1)
+
+        assert tmp_db.rename_session("sess-001", "debugging email")
+        stats = tmp_db.get_session_stats()
+        assert stats[0].session_name == "debugging email"
+
+    def test_rename_by_name(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        tmp_db.end_session("sess-001", total_calls=0)
+
+        stats = tmp_db.get_session_stats()
+        auto_name = stats[0].session_name
+        assert tmp_db.rename_session(auto_name, "better name")
+
+        stats = tmp_db.get_session_stats()
+        assert stats[0].session_name == "better name"
+
+    def test_rename_nonexistent(self, tmp_db: MeterDB) -> None:
+        assert tmp_db.rename_session("nope", "name") is False
+
+    def test_session_without_calls(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        tmp_db.end_session("sess-001", total_calls=0)
+
+        stats = tmp_db.get_session_stats()
+        name = stats[0].session_name
+        assert "test" in name
+        assert "0calls" in name
+
+
 class TestDailyTotals:
     def test_daily_totals(self, tmp_db: MeterDB) -> None:
         _make_session(tmp_db)

@@ -31,6 +31,7 @@ class Session:
     server_name: str = ""
     server_command: str = ""
     started_at: str = ""
+    name: str = ""
     ended_at: str | None = None
     total_calls: int = 0
 
@@ -52,6 +53,7 @@ class SessionStats:
     """Aggregated stats for a session."""
 
     session_id: str = ""
+    session_name: str = ""
     server_name: str = ""
     started_at: str = ""
     total_calls: int = 0

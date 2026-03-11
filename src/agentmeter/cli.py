@@ -93,7 +93,7 @@ def sessions(limit: int) -> None:
 
     for ss in session_stats:
         click.echo()
-        click.echo(f"  Session: {ss.session_id} ({ss.server_name})")
+        click.echo(f"  Session: {ss.session_name} ({ss.server_name})")
         click.echo(f"  Started: {ss.started_at}")
         click.echo(f"  {'─' * 50}")
 
@@ -140,6 +140,23 @@ def daily(days: int) -> None:
         )
 
     click.echo()
+    db.close()
+
+
+@main.command()
+@click.argument("session_id")
+@click.argument("name")
+def rename(session_id: str, name: str) -> None:
+    """Rename a session.
+
+    Example:
+        agentmeter rename a3f8b2c1d4e5 "debugging email search"
+    """
+    db = MeterDB()
+    if db.rename_session(session_id, name):
+        click.echo(f"  Renamed to: {name}")
+    else:
+        click.echo(f"  Session not found: {session_id}")
     db.close()
 
 
