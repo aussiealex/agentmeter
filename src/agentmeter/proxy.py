@@ -77,33 +77,39 @@ class AgentMeterProxy:
             env=self._env,
         )
 
-        # Connect to child MCP server
-        async with (
-            stdio_client(child_params) as (child_read, child_write),
-            ClientSession(child_read, child_write) as client_session,
-        ):
-                self._client_session = client_session
+        try:
+            # Connect to child MCP server
+            async with (
+                stdio_client(child_params) as (child_read, child_write),
+                ClientSession(child_read, child_write) as client_session,
+            ):
+                    self._client_session = client_session
 
-                # Initialize the child server
-                await client_session.initialize()
+                    # Initialize the child server
+                    await client_session.initialize()
 
-                # Discover tools from child
-                tools_result = await client_session.list_tools()
-                self._tools = tools_result.tools
+                    # Discover tools from child
+                    tools_result = await client_session.list_tools()
+                    self._tools = tools_result.tools
 
-                # Create proxy server that re-exports child's tools
-                proxy_server = self._build_proxy_server()
+                    # Create proxy server that re-exports child's tools
+                    proxy_server = self._build_proxy_server()
 
-                # Serve to parent (Claude Code) via stdio
-                async with stdio_server() as (parent_read, parent_write):
-                    await proxy_server.run(
-                        parent_read,
-                        parent_write,
-                        proxy_server.create_initialization_options(),
-                    )
-
-        # End session
-        self._db.end_session(self._session_id, self._call_count)
+                    # Serve to parent (Claude Code) via stdio
+                    async with stdio_server() as (parent_read, parent_write):
+                        await proxy_server.run(
+                            parent_read,
+                            parent_write,
+                            proxy_server.create_initialization_options(),
+                        )
+        except FileNotFoundError:
+            _log(f"command not found: {self._command}")
+            raise
+        except Exception as exc:
+            _log(f"proxy error: {exc}")
+            raise
+        finally:
+            self._db.end_session(self._session_id, self._call_count)
 
     def _build_proxy_server(self) -> Server:
         """Build the MCP server that faces the parent client."""
@@ -142,8 +148,12 @@ class AgentMeterProxy:
         async def handle_read_resource(uri) -> ReadResourceResult | str:
             if self._client_session is None:
                 return "No connection to server"
-            result = await self._client_session.read_resource(uri)
-            return result
+            try:
+                result = await self._client_session.read_resource(uri)
+                return result
+            except Exception as exc:
+                _log(f"read_resource error ({uri}): {exc}")
+                return f"Error reading resource: {exc}"
 
         # Forward prompts if child supports them
         @server.list_prompts()
@@ -160,10 +170,23 @@ class AgentMeterProxy:
         async def handle_get_prompt(name: str, arguments: dict | None = None):
             if self._client_session is None:
                 return GetPromptResult(messages=[])
-            result = await self._client_session.get_prompt(name, arguments)
-            return result
+            try:
+                result = await self._client_session.get_prompt(name, arguments)
+                return result
+            except Exception as exc:
+                _log(f"get_prompt error ({name}): {exc}")
+                return GetPromptResult(messages=[])
 
         return server
+
+    def _record_call_safe(self, call: ToolCall) -> None:
+        """Record a tool call, logging but not raising on DB errors."""
+        try:
+            self._db.record_call(call)
+            self._call_count += 1
+        except Exception as exc:
+            _log(f"failed to record call: {exc}")
+            self._call_count += 1
 
     async def _forward_tool_call(
         self,
@@ -181,7 +204,10 @@ class AgentMeterProxy:
             )
 
         # Serialize arguments for logging
-        args_json = json.dumps(arguments, default=str)
+        try:
+            args_json = json.dumps(arguments, default=str)
+        except (TypeError, ValueError):
+            args_json = str(arguments)
         started_at = datetime.now().isoformat()
         start_time = perf_counter()
 
@@ -214,8 +240,7 @@ class AgentMeterProxy:
                 started_at=started_at,
                 elapsed_ms=elapsed_ms,
             )
-            self._db.record_call(call)
-            self._call_count += 1
+            self._record_call_safe(call)
 
             # Log to stderr so it doesn't interfere with MCP stdio
             _log(
@@ -240,8 +265,7 @@ class AgentMeterProxy:
                 started_at=started_at,
                 elapsed_ms=elapsed_ms,
             )
-            self._db.record_call(call)
-            self._call_count += 1
+            self._record_call_safe(call)
 
             _log(f"[{self._server_name}] {name} EXCEPTION {elapsed_ms}ms: {exc}")
 
