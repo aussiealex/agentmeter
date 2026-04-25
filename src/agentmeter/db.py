@@ -182,36 +182,46 @@ class MeterDB:
 
     # ── Query operations ────────────────────────────────────────────
 
+    @staticmethod
+    def _build_where(
+        clauses: list[str],
+    ) -> str:
+        """Join WHERE clauses safely. All clauses must be hardcoded strings."""
+        if not clauses:
+            return ""
+        return "WHERE " + " AND ".join(clauses)
+
     def get_tool_stats(
         self,
         since: str | None = None,
         server_name: str | None = None,
     ) -> list[ToolStats]:
         """Get aggregated stats per tool, optionally filtered by time and server."""
-        where_clauses = []
+        clauses: list[str] = []
         params: list[str] = []
 
         if since:
-            where_clauses.append("created_at >= ?")
+            clauses.append("created_at >= ?")
             params.append(since)
         if server_name:
-            where_clauses.append("server_name = ?")
+            clauses.append("server_name = ?")
             params.append(server_name)
 
-        where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        where = self._build_where(clauses)
 
-        rows = self._conn.execute(
-            f"SELECT tool_name, "
-            f"COUNT(*) as call_count, "
-            f"SUM(is_error) as error_count, "
-            f"SUM(elapsed_ms) as total_elapsed_ms, "
-            f"AVG(elapsed_ms) as avg_elapsed_ms, "
-            f"SUM(result_size) as total_result_size "
-            f"FROM tool_call {where} "
-            f"GROUP BY tool_name "
-            f"ORDER BY call_count DESC",
-            params,
-        ).fetchall()
+        query = (
+            "SELECT tool_name, "
+            "COUNT(*) as call_count, "
+            "SUM(is_error) as error_count, "
+            "SUM(elapsed_ms) as total_elapsed_ms, "
+            "AVG(elapsed_ms) as avg_elapsed_ms, "
+            "SUM(result_size) as total_result_size "
+            "FROM tool_call " + where + " "
+            "GROUP BY tool_name "
+            "ORDER BY call_count DESC"
+        )
+
+        rows = self._conn.execute(query, params).fetchall()
 
         return [
             ToolStats(
@@ -231,20 +241,29 @@ class MeterDB:
         limit: int = 20,
     ) -> list[SessionStats]:
         """Get per-session stats with tool breakdowns."""
-        where = f"WHERE s.started_at >= '{since}'" if since else ""
+        clauses: list[str] = []
+        params: list = []
 
-        sessions = self._conn.execute(
-            f"SELECT s.id, s.name, s.server_name, s.started_at, s.total_calls, "
-            f"COALESCE(SUM(tc.is_error), 0) as total_errors, "
-            f"COALESCE(SUM(tc.elapsed_ms), 0) as total_elapsed_ms "
-            f"FROM session s "
-            f"LEFT JOIN tool_call tc ON tc.session_id = s.id "
-            f"{where} "
-            f"GROUP BY s.id "
-            f"ORDER BY s.started_at DESC "
-            f"LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if since:
+            clauses.append("s.started_at >= ?")
+            params.append(since)
+
+        where = self._build_where(clauses)
+        params.append(limit)
+
+        query = (
+            "SELECT s.id, s.name, s.server_name, s.started_at, s.total_calls, "
+            "COALESCE(SUM(tc.is_error), 0) as total_errors, "
+            "COALESCE(SUM(tc.elapsed_ms), 0) as total_elapsed_ms "
+            "FROM session s "
+            "LEFT JOIN tool_call tc ON tc.session_id = s.id "
+            + where + " "
+            "GROUP BY s.id "
+            "ORDER BY s.started_at DESC "
+            "LIMIT ?"
+        )
+
+        sessions = self._conn.execute(query, params).fetchall()
 
         results = []
         for s in sessions:
@@ -292,13 +311,22 @@ class MeterDB:
         tool_name: str | None = None,
     ) -> list[ToolCall]:
         """Get recent individual tool calls."""
-        where = f"WHERE tool_name = '{tool_name}'" if tool_name else ""
+        clauses: list[str] = []
+        params: list = []
 
-        rows = self._conn.execute(
-            f"SELECT * FROM tool_call {where} "
-            f"ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if tool_name:
+            clauses.append("tool_name = ?")
+            params.append(tool_name)
+
+        where = self._build_where(clauses)
+        params.append(limit)
+
+        query = (
+            "SELECT * FROM tool_call " + where + " "
+            "ORDER BY created_at DESC LIMIT ?"
+        )
+
+        rows = self._conn.execute(query, params).fetchall()
 
         return [
             ToolCall(
@@ -342,8 +370,16 @@ class MeterDB:
         ]
 
     def get_total_calls(self, since: str | None = None) -> int:
-        where = f"WHERE created_at >= '{since}'" if since else ""
-        row = self._conn.execute(
-            f"SELECT COUNT(*) as cnt FROM tool_call {where}"
-        ).fetchone()
+        clauses: list[str] = []
+        params: list = []
+
+        if since:
+            clauses.append("created_at >= ?")
+            params.append(since)
+
+        where = self._build_where(clauses)
+
+        query = "SELECT COUNT(*) as cnt FROM tool_call " + where
+
+        row = self._conn.execute(query, params).fetchone()
         return row["cnt"] if row else 0
