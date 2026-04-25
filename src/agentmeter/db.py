@@ -7,7 +7,14 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from agentmeter.models import Budget, Session, SessionStats, ToolCall, ToolStats
+from agentmeter.models import (
+    BreakerConfig,
+    Budget,
+    Session,
+    SessionStats,
+    ToolCall,
+    ToolStats,
+)
 
 
 def _default_db_path() -> Path:
@@ -46,6 +53,24 @@ CREATE INDEX IF NOT EXISTS idx_tool_call_session ON tool_call(session_id);
 CREATE INDEX IF NOT EXISTS idx_tool_call_tool_name ON tool_call(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tool_call_created_at ON tool_call(created_at);
 CREATE INDEX IF NOT EXISTS idx_tool_call_server_name ON tool_call(server_name);
+
+CREATE TABLE IF NOT EXISTS breaker (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_name     TEXT NOT NULL DEFAULT '',
+    max_calls       INTEGER NOT NULL DEFAULT 20,
+    window_seconds  INTEGER NOT NULL DEFAULT 60,
+    cooldown_seconds INTEGER NOT NULL DEFAULT 300,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS breaker_trip (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_name     TEXT NOT NULL,
+    call_count      INTEGER NOT NULL,
+    window_seconds  INTEGER NOT NULL,
+    tripped_at      TEXT NOT NULL,
+    resolved_at     TEXT
+);
 
 CREATE TABLE IF NOT EXISTS budget (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -545,6 +570,123 @@ class MeterDB:
                     ))
 
         return warnings
+
+    # ── Circuit breaker operations ─────────────────────────────────
+
+    def set_breaker(self, config: BreakerConfig) -> int:
+        """Create or replace a circuit breaker config. Returns row ID."""
+        self._conn.execute(
+            "DELETE FROM breaker WHERE server_name = ?",
+            (config.server_name,),
+        )
+        cursor = self._conn.execute(
+            "INSERT INTO breaker "
+            "(server_name, max_calls, window_seconds, "
+            "cooldown_seconds, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                config.server_name,
+                config.max_calls,
+                config.window_seconds,
+                config.cooldown_seconds,
+                config.created_at,
+            ),
+        )
+        self._conn.commit()
+        return cursor.lastrowid or 0
+
+    def get_breakers(self) -> list[BreakerConfig]:
+        """Get all circuit breaker configs."""
+        rows = self._conn.execute(
+            "SELECT * FROM breaker ORDER BY server_name"
+        ).fetchall()
+        return [
+            BreakerConfig(
+                id=r["id"],
+                server_name=r["server_name"],
+                max_calls=r["max_calls"],
+                window_seconds=r["window_seconds"],
+                cooldown_seconds=r["cooldown_seconds"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_breaker_for_server(
+        self, server_name: str,
+    ) -> BreakerConfig | None:
+        """Get the breaker config that applies to a server.
+
+        Server-specific rules take precedence over global ("").
+        """
+        row = self._conn.execute(
+            "SELECT * FROM breaker WHERE server_name = ?",
+            (server_name,),
+        ).fetchone()
+        if row:
+            return BreakerConfig(
+                id=row["id"],
+                server_name=row["server_name"],
+                max_calls=row["max_calls"],
+                window_seconds=row["window_seconds"],
+                cooldown_seconds=row["cooldown_seconds"],
+            )
+        # Fall back to global
+        row = self._conn.execute(
+            "SELECT * FROM breaker WHERE server_name = ''",
+        ).fetchone()
+        if row:
+            return BreakerConfig(
+                id=row["id"],
+                server_name=row["server_name"],
+                max_calls=row["max_calls"],
+                window_seconds=row["window_seconds"],
+                cooldown_seconds=row["cooldown_seconds"],
+            )
+        return None
+
+    def clear_breakers(
+        self, server_name: str | None = None,
+    ) -> int:
+        """Remove breaker configs. Returns count removed."""
+        if server_name is not None:
+            cursor = self._conn.execute(
+                "DELETE FROM breaker WHERE server_name = ?",
+                (server_name,),
+            )
+        else:
+            cursor = self._conn.execute("DELETE FROM breaker")
+        self._conn.commit()
+        return cursor.rowcount
+
+    def record_breaker_trip(
+        self,
+        server_name: str,
+        call_count: int,
+        window_seconds: int,
+    ) -> None:
+        """Log a circuit breaker trip event."""
+        self._conn.execute(
+            "INSERT INTO breaker_trip "
+            "(server_name, call_count, window_seconds, tripped_at) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                server_name,
+                call_count,
+                window_seconds,
+                datetime.now().isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def get_breaker_trips(self, limit: int = 10) -> list[dict]:
+        """Get recent breaker trip events."""
+        rows = self._conn.execute(
+            "SELECT * FROM breaker_trip "
+            "ORDER BY tripped_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     # ── Aggregate queries ────────────────────────────────────────
 

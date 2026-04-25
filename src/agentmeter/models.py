@@ -77,4 +77,24 @@ class Budget:
     server_name: str = ""        # "" = all servers
     max_calls: int = 0
     action: str = "deny"         # "deny" or "warn"
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now().isoformat(),
+    )
+
+
+@dataclass
+class BreakerConfig:
+    """Circuit breaker configuration.
+
+    Trips when call rate exceeds max_calls within window_seconds.
+    Once tripped, blocks all calls for cooldown_seconds.
+    """
+
+    id: int | None = None
+    server_name: str = ""        # "" = all servers
+    max_calls: int = 20          # calls within window to trip
+    window_seconds: int = 60     # rolling window size
+    cooldown_seconds: int = 300  # block duration after trip
+    created_at: str = field(
+        default_factory=lambda: datetime.now().isoformat(),
+    )

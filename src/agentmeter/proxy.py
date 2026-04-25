@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from collections import deque
 from datetime import datetime
-from time import perf_counter
+from time import perf_counter, time
 
 import anyio
 from mcp.client.session import ClientSession
@@ -49,6 +50,9 @@ class AgentMeterProxy:
         self._call_count = 0
         self._client_session: ClientSession | None = None
         self._tools: list[Tool] = []
+        # Circuit breaker state (in-memory, per-session)
+        self._call_timestamps: deque[float] = deque()
+        self._breaker_tripped_at: float | None = None
 
     @staticmethod
     def _infer_server_name(command: str, args: list[str]) -> str:
@@ -237,6 +241,100 @@ class AgentMeterProxy:
 
         return None
 
+    def _check_breaker(self, tool_name: str) -> CallToolResult | None:
+        """Check circuit breaker before forwarding a call.
+
+        Returns a denial if the breaker is tripped and cooldown
+        hasn't elapsed, or if the call rate exceeds the threshold.
+        """
+        try:
+            config = self._db.get_breaker_for_server(
+                self._server_name,
+            )
+            if not config:
+                return None
+
+            now = time()
+
+            # If breaker is tripped, check cooldown
+            if self._breaker_tripped_at is not None:
+                elapsed = now - self._breaker_tripped_at
+                if elapsed < config.cooldown_seconds:
+                    remaining = int(
+                        config.cooldown_seconds - elapsed,
+                    )
+                    msg = (
+                        f"AgentMeter: circuit breaker open — "
+                        f"call rate exceeded "
+                        f"{config.max_calls} calls/"
+                        f"{config.window_seconds}s. "
+                        f"Cooling down for {remaining}s. "
+                        f"Tool '{tool_name}' was not executed."
+                    )
+                    _log(
+                        f"[{self._server_name}] {tool_name} "
+                        f"BREAKER OPEN ({remaining}s remaining)"
+                    )
+                    return CallToolResult(
+                        content=[TextContent(
+                            type="text", text=msg,
+                        )],
+                        isError=True,
+                    )
+                # Cooldown expired — reset
+                self._breaker_tripped_at = None
+                self._call_timestamps.clear()
+                _log(
+                    f"[{self._server_name}] "
+                    f"circuit breaker reset"
+                )
+
+            # Prune timestamps outside the window
+            cutoff = now - config.window_seconds
+            while (
+                self._call_timestamps
+                and self._call_timestamps[0] < cutoff
+            ):
+                self._call_timestamps.popleft()
+
+            # Record this call's timestamp
+            self._call_timestamps.append(now)
+
+            # Check if we've exceeded the threshold
+            if len(self._call_timestamps) > config.max_calls:
+                self._breaker_tripped_at = now
+                self._db.record_breaker_trip(
+                    server_name=self._server_name,
+                    call_count=len(self._call_timestamps),
+                    window_seconds=config.window_seconds,
+                )
+                msg = (
+                    f"AgentMeter: circuit breaker tripped — "
+                    f"{len(self._call_timestamps)} calls in "
+                    f"{config.window_seconds}s "
+                    f"(limit: {config.max_calls}). "
+                    f"All calls blocked for "
+                    f"{config.cooldown_seconds}s. "
+                    f"Tool '{tool_name}' was not executed."
+                )
+                _log(
+                    f"[{self._server_name}] {tool_name} "
+                    f"BREAKER TRIPPED "
+                    f"({len(self._call_timestamps)} calls/"
+                    f"{config.window_seconds}s)"
+                )
+                return CallToolResult(
+                    content=[TextContent(
+                        type="text", text=msg,
+                    )],
+                    isError=True,
+                )
+
+        except Exception as exc:
+            _log(f"breaker check error: {exc}")
+
+        return None
+
     async def _forward_tool_call(
         self,
         name: str,
@@ -245,6 +343,11 @@ class AgentMeterProxy:
         """Forward a tool call to child server and record metrics."""
         # Check budget before forwarding
         denial = self._check_budget(name)
+        if denial:
+            return denial
+
+        # Check circuit breaker
+        denial = self._check_breaker(name)
         if denial:
             return denial
 

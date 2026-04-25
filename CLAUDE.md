@@ -38,7 +38,7 @@ src/agentmeter/
 ├── __main__.py       # python -m agentmeter entry point
 ├── proxy.py          # MCP proxy core — the main product
 ├── db.py             # SQLite storage for metering data
-├── models.py         # Dataclasses: ToolCall, Session, ToolStats, SessionStats
+├── models.py         # Dataclasses: ToolCall, Session, Budget, BreakerConfig, etc.
 └── cli.py            # CLI: wrap, stats, sessions, calls, daily, rename
 tests/
 ├── conftest.py       # Shared fixtures (tmp_db, test_server_path)
@@ -78,6 +78,13 @@ agentmeter budget set daily 100 -s mail   # per-server daily limit
 agentmeter budget set session 30 -a warn  # warn but don't block
 agentmeter budget show                    # list all rules
 agentmeter budget clear --yes             # remove all rules
+
+# Circuit breakers (velocity-based)
+agentmeter breaker set 20 60              # trip after 20 calls in 60s
+agentmeter breaker set 10 30 -c 600       # custom cooldown (600s)
+agentmeter breaker set 50 120 -s mailsift # server-specific
+agentmeter breaker show                   # configs + recent trips
+agentmeter breaker clear --yes            # remove all
 
 # Run tests
 python3 -m pytest tests/ -v
