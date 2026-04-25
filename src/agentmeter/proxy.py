@@ -188,12 +188,66 @@ class AgentMeterProxy:
             _log(f"failed to record call: {exc}")
             self._call_count += 1
 
+    def _check_budget(self, tool_name: str) -> CallToolResult | None:
+        """Check budget rules before forwarding a call.
+
+        Returns a denial CallToolResult if a deny-budget is exceeded,
+        or None if the call should proceed.
+        """
+        try:
+            denied = self._db.check_budget(
+                self._session_id, self._server_name,
+            )
+            if denied:
+                scope_label = (
+                    f"{denied.scope} ({denied.server_name})"
+                    if denied.server_name
+                    else denied.scope
+                )
+                msg = (
+                    f"AgentMeter: budget exceeded — "
+                    f"{denied.max_calls}/{denied.max_calls} calls used "
+                    f"({scope_label} limit). "
+                    f"Tool '{tool_name}' was not executed. "
+                    f"Consider completing your task with the calls already made, "
+                    f"or ask the user to adjust the budget with: "
+                    f"agentmeter budget set {denied.scope} {denied.max_calls}"
+                )
+                _log(
+                    f"[{self._server_name}] {tool_name} DENIED "
+                    f"(budget: {scope_label} {denied.max_calls} calls)"
+                )
+                return CallToolResult(
+                    content=[TextContent(type="text", text=msg)],
+                    isError=True,
+                )
+
+            # Check warnings (log but don't block)
+            warnings = self._db.get_budget_warnings(
+                self._session_id, self._server_name,
+            )
+            for w in warnings:
+                _log(
+                    f"[{self._server_name}] budget warning: "
+                    f"{w.scope} limit ({w.max_calls} calls) reached"
+                )
+        except Exception as exc:
+            # Budget check failure should never block tool calls
+            _log(f"budget check error: {exc}")
+
+        return None
+
     async def _forward_tool_call(
         self,
         name: str,
         arguments: dict,
     ) -> CallToolResult:
         """Forward a tool call to child server and record metrics."""
+        # Check budget before forwarding
+        denial = self._check_budget(name)
+        if denial:
+            return denial
+
         if self._client_session is None:
             return CallToolResult(
                 content=[TextContent(

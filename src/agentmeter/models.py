@@ -60,3 +60,21 @@ class SessionStats:
     total_errors: int = 0
     total_elapsed_ms: int = 0
     tools: list[ToolStats] = field(default_factory=list)
+
+
+@dataclass
+class Budget:
+    """A budget rule that limits tool call volume.
+
+    Scopes:
+      - session: limit applies per proxy run
+      - daily: limit resets each calendar day
+    Server_name "" means the rule applies to all servers.
+    """
+
+    id: int | None = None
+    scope: str = "daily"         # "session" or "daily"
+    server_name: str = ""        # "" = all servers
+    max_calls: int = 0
+    action: str = "deny"         # "deny" or "warn"
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())

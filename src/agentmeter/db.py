@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from agentmeter.models import Session, SessionStats, ToolCall, ToolStats
+from agentmeter.models import Budget, Session, SessionStats, ToolCall, ToolStats
 
 
 def _default_db_path() -> Path:
@@ -46,6 +46,15 @@ CREATE INDEX IF NOT EXISTS idx_tool_call_session ON tool_call(session_id);
 CREATE INDEX IF NOT EXISTS idx_tool_call_tool_name ON tool_call(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tool_call_created_at ON tool_call(created_at);
 CREATE INDEX IF NOT EXISTS idx_tool_call_server_name ON tool_call(server_name);
+
+CREATE TABLE IF NOT EXISTS budget (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope           TEXT NOT NULL,
+    server_name     TEXT NOT NULL DEFAULT '',
+    max_calls       INTEGER NOT NULL,
+    action          TEXT NOT NULL DEFAULT 'deny',
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -368,6 +377,176 @@ class MeterDB:
             }
             for r in rows
         ]
+
+    # ── Budget operations ─────────────────────────────────────────
+
+    def set_budget(self, budget: Budget) -> int:
+        """Create or replace a budget rule. Returns the row ID."""
+        # Remove existing rule with same scope + server_name
+        self._conn.execute(
+            "DELETE FROM budget WHERE scope = ? AND server_name = ?",
+            (budget.scope, budget.server_name),
+        )
+        cursor = self._conn.execute(
+            "INSERT INTO budget (scope, server_name, max_calls, action, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                budget.scope,
+                budget.server_name,
+                budget.max_calls,
+                budget.action,
+                budget.created_at,
+            ),
+        )
+        self._conn.commit()
+        return cursor.lastrowid or 0
+
+    def get_budgets(self) -> list[Budget]:
+        """Get all budget rules."""
+        rows = self._conn.execute(
+            "SELECT * FROM budget ORDER BY scope, server_name"
+        ).fetchall()
+        return [
+            Budget(
+                id=r["id"],
+                scope=r["scope"],
+                server_name=r["server_name"],
+                max_calls=r["max_calls"],
+                action=r["action"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def clear_budget(
+        self,
+        scope: str | None = None,
+        server_name: str | None = None,
+    ) -> int:
+        """Remove budget rules. Returns count of rules removed."""
+        clauses: list[str] = []
+        params: list[str] = []
+
+        if scope:
+            clauses.append("scope = ?")
+            params.append(scope)
+        if server_name is not None:
+            clauses.append("server_name = ?")
+            params.append(server_name)
+
+        where = self._build_where(clauses)
+        query = "DELETE FROM budget " + where
+
+        cursor = self._conn.execute(query, params)
+        self._conn.commit()
+        return cursor.rowcount
+
+    def check_budget(
+        self,
+        session_id: str,
+        server_name: str,
+    ) -> Budget | None:
+        """Check if any budget rule would deny the next call.
+
+        Returns the first violated Budget with action='deny', or None if OK.
+        """
+        budgets = self._conn.execute(
+            "SELECT * FROM budget WHERE action = 'deny'",
+        ).fetchall()
+
+        for b in budgets:
+            # Skip rules that don't apply to this server
+            if b["server_name"] and b["server_name"] != server_name:
+                continue
+
+            if b["scope"] == "session":
+                count = self._conn.execute(
+                    "SELECT COUNT(*) as cnt FROM tool_call "
+                    "WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                if count and count["cnt"] >= b["max_calls"]:
+                    return Budget(
+                        id=b["id"],
+                        scope=b["scope"],
+                        server_name=b["server_name"],
+                        max_calls=b["max_calls"],
+                        action=b["action"],
+                    )
+
+            elif b["scope"] == "daily":
+                today = datetime.now().strftime("%Y-%m-%d")
+                clauses = ["created_at >= ?"]
+                params: list = [today]
+                if b["server_name"]:
+                    clauses.append("server_name = ?")
+                    params.append(b["server_name"])
+                where = self._build_where(clauses)
+                count = self._conn.execute(
+                    "SELECT COUNT(*) as cnt FROM tool_call " + where,
+                    params,
+                ).fetchone()
+                if count and count["cnt"] >= b["max_calls"]:
+                    return Budget(
+                        id=b["id"],
+                        scope=b["scope"],
+                        server_name=b["server_name"],
+                        max_calls=b["max_calls"],
+                        action=b["action"],
+                    )
+
+        return None
+
+    def get_budget_warnings(
+        self,
+        session_id: str,
+        server_name: str,
+    ) -> list[Budget]:
+        """Get budget rules with action='warn' that are at or over limit."""
+        budgets = self._conn.execute(
+            "SELECT * FROM budget WHERE action = 'warn'",
+        ).fetchall()
+
+        warnings: list[Budget] = []
+        for b in budgets:
+            if b["server_name"] and b["server_name"] != server_name:
+                continue
+
+            if b["scope"] == "session":
+                count = self._conn.execute(
+                    "SELECT COUNT(*) as cnt FROM tool_call "
+                    "WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                if count and count["cnt"] >= b["max_calls"]:
+                    warnings.append(Budget(
+                        id=b["id"], scope=b["scope"],
+                        server_name=b["server_name"],
+                        max_calls=b["max_calls"], action=b["action"],
+                    ))
+
+            elif b["scope"] == "daily":
+                today = datetime.now().strftime("%Y-%m-%d")
+                clauses = ["created_at >= ?"]
+                params: list = [today]
+                if b["server_name"]:
+                    clauses.append("server_name = ?")
+                    params.append(b["server_name"])
+                where = self._build_where(clauses)
+                count = self._conn.execute(
+                    "SELECT COUNT(*) as cnt FROM tool_call " + where,
+                    params,
+                ).fetchone()
+                if count and count["cnt"] >= b["max_calls"]:
+                    warnings.append(Budget(
+                        id=b["id"], scope=b["scope"],
+                        server_name=b["server_name"],
+                        max_calls=b["max_calls"], action=b["action"],
+                    ))
+
+        return warnings
+
+    # ── Aggregate queries ────────────────────────────────────────
 
     def get_total_calls(self, since: str | None = None) -> int:
         clauses: list[str] = []

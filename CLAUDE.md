@@ -8,13 +8,6 @@ economics layer for MCP agents.
 
 **Tagline:** "Know what your agents cost."
 
-## Current Status
-
-**Week 1 MVP — working prototype.** The proxy wraps any MCP server, forwards
-all tool calls, and records metrics to SQLite. CLI shows stats, sessions,
-individual calls, and daily totals. Tested against a real MCP server (MailSift)
-with ProtonMail Bridge.
-
 ## Architecture
 
 ```
@@ -31,7 +24,7 @@ and proxies all MCP traffic via stdio.
 ## Tech Stack
 
 - **Language:** Python 3.11+
-- **MCP:** mcp SDK (same as MailSift)
+- **MCP:** mcp SDK
 - **Database:** SQLite (WAL mode)
 - **CLI:** click
 - **Async:** anyio
@@ -46,10 +39,17 @@ src/agentmeter/
 ├── proxy.py          # MCP proxy core — the main product
 ├── db.py             # SQLite storage for metering data
 ├── models.py         # Dataclasses: ToolCall, Session, ToolStats, SessionStats
-└── cli.py            # CLI: wrap, stats, sessions, calls, daily
+└── cli.py            # CLI: wrap, stats, sessions, calls, daily, rename
 tests/
-├── test_proxy.py     # Integration test (proxy + test server)
-└── test_server.py    # Minimal MCP server for testing
+├── conftest.py       # Shared fixtures (tmp_db, test_server_path)
+├── test_db.py        # DB unit tests (positive)
+├── test_security.py  # SQL injection, file system safety, data truncation
+├── test_boundaries.py # String, numeric, limit, time edge cases
+├── test_cli.py       # CLI command tests via CliRunner
+├── test_integration.py # End-to-end proxy tests (pytest)
+├── test_proxy.py     # Standalone integration test (manual)
+├── test_server.py    # Minimal MCP server for testing
+└── TEST_STRATEGY.md  # Test strategy with deferred test triggers
 ```
 
 ## Running
@@ -71,44 +71,17 @@ agentmeter calls --tool add   # filter by tool name
 agentmeter sessions           # session breakdowns
 agentmeter daily              # daily totals with bar chart
 
-# Run integration test
-python tests/test_proxy.py
+# Budget enforcement
+agentmeter budget set session 50          # max 50 calls per session
+agentmeter budget set daily 200           # max 200 calls per day
+agentmeter budget set daily 100 -s mail   # per-server daily limit
+agentmeter budget set session 30 -a warn  # warn but don't block
+agentmeter budget show                    # list all rules
+agentmeter budget clear --yes             # remove all rules
+
+# Run tests
+python3 -m pytest tests/ -v
 ```
-
-## What's Done (Week 1)
-
-- [x] MCP proxy that forwards all tool calls to child server
-- [x] SQLite metering: tool name, timing, response size, error status
-- [x] Session tracking with per-tool breakdowns
-- [x] CLI with stats, calls, sessions, daily commands
-- [x] Tested with real MCP server (MailSift + ProtonMail Bridge)
-- [x] AGENTMETER_DB env var for custom DB path
-- [x] ruff clean, zero lint errors
-
-## What's Next (Week 1 remaining)
-
-- [ ] Error tracking test (verify failed tool calls are recorded correctly)
-- [ ] Budget enforcement (set max cost per session, refuse calls when exceeded)
-- [ ] Session naming (human-readable names instead of hex IDs)
-- [ ] More robust error handling in proxy
-
-## What's Next (Week 2)
-
-- [ ] Local web dashboard (single HTML file served by proxy)
-- [ ] Cost-per-task view
-- [ ] Tool leaderboard
-- [ ] Trend charts
-- [ ] JSON/CSV export
-- [ ] Session replay view
-- [ ] GitHub repo setup + public launch
-
-## What's Next (Month 2+)
-
-- [ ] API keys with budgets for customers
-- [ ] Usage reports per customer
-- [ ] Webhook on budget events
-- [ ] Cost allocation rules
-- [ ] Stripe integration
 
 ## Key Design Decisions
 
@@ -119,17 +92,23 @@ python tests/test_proxy.py
 - **Open source first:** Free gets distribution, paid comes from hosted/enterprise
 - **Transparent proxy:** Zero config changes needed on either side — just wrap
   the command
+- **Budget-aware denials:** When a budget is exceeded, the proxy returns an
+  informative error the agent can reason about — not a crash or silent drop.
+  Warn mode logs but allows the call through.
 
-## Related Project
+## Non-Obvious Patterns
 
-AgentMeter was built alongside MailSift (/media/aa/LargeBackup/MainApps/MailSift),
-which is the MCP server used for testing. MailSift connects Claude Code to
-ProtonMail Bridge for email search.
+Patterns that cause subtle bugs if an agent doesn't know about them:
 
-## Strategy Document
+- **WAL mode is critical** — SQLite is configured with WAL (Write-Ahead Logging) for concurrent read/write between the proxy and the CLI stats commands. Don't change the journal mode or add `PRAGMA journal_mode=DELETE` — it will cause locking errors during active metering.
+- **Proxy must never modify tool call data** — AgentMeter is a transparent proxy. It reads and records tool calls but must never alter the request or response payloads. Any change to the proxy path must preserve this invariance.
+- **Session boundaries are inferred** — there's no explicit "session start" signal from the agent. Sessions are inferred from gaps in tool call timestamps. If you change the gap threshold, existing session groupings in historical data will shift.
+- **Empty README** — the README has no content yet. This is a known gap for the open-source launch but don't generate one without the user's input — it's a marketing asset, not just docs.
 
-Full business strategy is at:
-`/media/aa/LargeBackup/MainApps/AgentMeter/reports/agent-economics-strategy.html`
+## Pending Enhancements
+
+Check `/media/aa/LargeBackup/MainApps/_playbook/actionables.md` for
+digest-sourced action items tagged to this project.
 
 ## Constraints
 
@@ -137,3 +116,4 @@ Full business strategy is at:
 - All data structures are dataclasses — no dicts-as-data
 - Proxy must be fully transparent — no modification of tool call data
 - Local-first: no cloud services, no accounts, no signup
+- All SQL queries must use parameterized `?` placeholders — no f-string interpolation
