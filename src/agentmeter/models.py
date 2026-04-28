@@ -63,6 +63,23 @@ class SessionStats:
 
 
 @dataclass
+class ServerDistribution:
+    """Percentile distribution of session metrics for a server."""
+
+    server_name: str = ""
+    session_count: int = 0
+    p50_calls: int = 0
+    p90_calls: int = 0
+    p99_calls: int = 0
+    p50_elapsed_ms: int = 0
+    p90_elapsed_ms: int = 0
+    p99_elapsed_ms: int = 0
+    p50_result_bytes: int = 0
+    p90_result_bytes: int = 0
+    p99_result_bytes: int = 0
+
+
+@dataclass
 class Budget:
     """A budget rule that limits tool call volume.
 

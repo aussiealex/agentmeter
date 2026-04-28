@@ -97,6 +97,36 @@ class TestStatsCommand:
         assert result.exit_code == 0
         assert "No tool calls" in result.output
 
+    def test_stats_distribution(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        result = _invoke(cli_runner, ["stats", "--distribution"], seeded_db)
+        assert result.exit_code == 0
+        assert "Session Distribution" in result.output
+        assert "testserver" in result.output
+        assert "p50" in result.output
+        assert "p90" in result.output
+        assert "p99" in result.output
+
+    def test_stats_distribution_with_server_filter(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        result = _invoke(
+            cli_runner, ["stats", "--distribution", "--server", "testserver"],
+            seeded_db,
+        )
+        assert result.exit_code == 0
+        assert "testserver" in result.output
+
+    def test_stats_distribution_empty_db(
+        self, cli_runner: CliRunner, tmp_path: Path,
+    ) -> None:
+        db_path = tmp_path / "empty.db"
+        MeterDB(db_path).close()
+        result = _invoke(cli_runner, ["stats", "--distribution"], db_path)
+        assert result.exit_code == 0
+        assert "No sessions" in result.output
+
 
 # ── Calls command ───────────────────────────────────────────────────
 

@@ -217,3 +217,91 @@ class TestDailyTotals:
         assert len(totals) == 1
         assert totals[0]["call_count"] == 2
         assert totals[0]["error_count"] == 1
+
+
+class TestSessionDistribution:
+    def test_single_server_single_session(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        _make_call(tmp_db, elapsed_ms=100, result_size=500)
+        _make_call(tmp_db, elapsed_ms=200, result_size=300)
+        tmp_db.end_session("sess-001", total_calls=2)
+
+        dists = tmp_db.get_session_distribution()
+        assert len(dists) == 1
+        assert dists[0].server_name == "test"
+        assert dists[0].session_count == 1
+        assert dists[0].p50_calls == 2
+        assert dists[0].p50_elapsed_ms == 300  # sum of 100+200
+        assert dists[0].p50_result_bytes == 800  # sum of 500+300
+
+    def test_multiple_sessions_same_server(self, tmp_db: MeterDB) -> None:
+        # Session with 1 call (small)
+        _make_session(tmp_db, session_id="s1")
+        _make_call(tmp_db, session_id="s1", elapsed_ms=50, result_size=100)
+        tmp_db.end_session("s1", total_calls=1)
+
+        # Session with 5 calls (large)
+        _make_session(tmp_db, session_id="s2")
+        for _ in range(5):
+            _make_call(tmp_db, session_id="s2", elapsed_ms=100, result_size=200)
+        tmp_db.end_session("s2", total_calls=5)
+
+        dists = tmp_db.get_session_distribution()
+        assert len(dists) == 1
+        assert dists[0].session_count == 2
+        # p50 = smaller session, p90/p99 = larger session
+        assert dists[0].p50_calls == 1
+        assert dists[0].p90_calls == 5
+
+    def test_multiple_servers(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db, session_id="s1", server_name="alpha")
+        call = ToolCall(
+            session_id="s1", server_name="alpha", tool_name="foo",
+            started_at=datetime.now().isoformat(), elapsed_ms=100, result_size=50,
+        )
+        tmp_db.record_call(call)
+        tmp_db.end_session("s1", total_calls=1)
+
+        _make_session(tmp_db, session_id="s2", server_name="beta")
+        call2 = ToolCall(
+            session_id="s2", server_name="beta", tool_name="bar",
+            started_at=datetime.now().isoformat(), elapsed_ms=500, result_size=2000,
+        )
+        tmp_db.record_call(call2)
+        tmp_db.end_session("s2", total_calls=1)
+
+        dists = tmp_db.get_session_distribution()
+        assert len(dists) == 2
+        names = [d.server_name for d in dists]
+        assert "alpha" in names
+        assert "beta" in names
+
+    def test_filter_by_server(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db, session_id="s1", server_name="alpha")
+        call = ToolCall(
+            session_id="s1", server_name="alpha", tool_name="foo",
+            started_at=datetime.now().isoformat(), elapsed_ms=100,
+        )
+        tmp_db.record_call(call)
+        tmp_db.end_session("s1", total_calls=1)
+
+        _make_session(tmp_db, session_id="s2", server_name="beta")
+        tmp_db.end_session("s2", total_calls=0)
+
+        dists = tmp_db.get_session_distribution(server_name="alpha")
+        assert len(dists) == 1
+        assert dists[0].server_name == "alpha"
+
+    def test_empty_db(self, tmp_db: MeterDB) -> None:
+        dists = tmp_db.get_session_distribution()
+        assert dists == []
+
+    def test_session_with_no_calls(self, tmp_db: MeterDB) -> None:
+        _make_session(tmp_db)
+        tmp_db.end_session("sess-001", total_calls=0)
+
+        dists = tmp_db.get_session_distribution()
+        assert len(dists) == 1
+        assert dists[0].p50_calls == 0
+        assert dists[0].p50_elapsed_ms == 0
+        assert dists[0].p50_result_bytes == 0

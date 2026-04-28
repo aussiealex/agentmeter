@@ -37,9 +37,18 @@ def wrap(command: str, args: tuple[str, ...], name: str) -> None:
 @click.option("--week", "period", flag_value="week", help="Show this week's stats.")
 @click.option("--all", "period", flag_value="all", help="Show all-time stats.")
 @click.option("--server", "-s", default=None, help="Filter by server name.")
-def stats(period: str | None, server: str | None) -> None:
+@click.option(
+    "--distribution", is_flag=True, default=False,
+    help="Show per-server session percentiles (p50/p90/p99).",
+)
+def stats(period: str | None, server: str | None, distribution: bool) -> None:
     """Show aggregated tool call statistics."""
     db = MeterDB()
+
+    if distribution:
+        _print_distribution(db, server)
+        db.close()
+        return
 
     since = None
     if period == "today":
@@ -371,6 +380,42 @@ def breaker_clear(server: str | None) -> None:
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
+
+
+def _print_distribution(db: MeterDB, server: str | None) -> None:
+    """Print per-server session distribution (p50/p90/p99)."""
+    dists = db.get_session_distribution(server_name=server)
+
+    if not dists:
+        click.echo("\n  No sessions recorded.\n")
+        return
+
+    click.echo()
+    click.echo("  Session Distribution (all time)")
+    click.echo(f"  {'─' * 70}")
+
+    for d in dists:
+        label = d.server_name or "(unnamed)"
+        click.echo(f"\n  {label}  ({d.session_count} sessions)")
+        click.echo(f"  {'─' * 50}")
+        click.echo(
+            f"  {'':>18}  {'p50':>10}  {'p90':>10}  {'p99':>10}"
+        )
+        click.echo(
+            f"  {'calls':>18}  {d.p50_calls:>10}  "
+            f"{d.p90_calls:>10}  {d.p99_calls:>10}"
+        )
+        click.echo(
+            f"  {'tool time':>18}  {_format_ms(d.p50_elapsed_ms):>10}  "
+            f"{_format_ms(d.p90_elapsed_ms):>10}  {_format_ms(d.p99_elapsed_ms):>10}"
+        )
+        rb = (d.p50_result_bytes, d.p90_result_bytes, d.p99_result_bytes)
+        click.echo(
+            f"  {'result size':>18}  {_format_bytes(rb[0]):>10}  "
+            f"{_format_bytes(rb[1]):>10}  {_format_bytes(rb[2]):>10}"
+        )
+
+    click.echo()
 
 
 def _print_tool_table(tools: list, total_calls: int) -> None:

@@ -10,6 +10,7 @@ from pathlib import Path
 from agentmeter.models import (
     BreakerConfig,
     Budget,
+    ServerDistribution,
     Session,
     SessionStats,
     ToolCall,
@@ -704,3 +705,76 @@ class MeterDB:
 
         row = self._conn.execute(query, params).fetchone()
         return row["cnt"] if row else 0
+
+    def get_session_distribution(
+        self,
+        server_name: str | None = None,
+    ) -> list[ServerDistribution]:
+        """Get percentile distributions of session metrics, grouped by server.
+
+        Returns p50/p90/p99 for calls, elapsed_ms, and result_size per server.
+        """
+        clauses: list[str] = []
+        params: list[str] = []
+
+        if server_name:
+            clauses.append("s.server_name = ?")
+            params.append(server_name)
+
+        where = self._build_where(clauses)
+
+        query = (
+            "SELECT s.server_name, s.id, "
+            "COALESCE(s.total_calls, 0) as calls, "
+            "COALESCE(SUM(tc.elapsed_ms), 0) as elapsed_ms, "
+            "COALESCE(SUM(tc.result_size), 0) as result_size "
+            "FROM session s "
+            "LEFT JOIN tool_call tc ON tc.session_id = s.id "
+            + where + " "
+            "GROUP BY s.id "
+            "ORDER BY s.server_name"
+        )
+
+        rows = self._conn.execute(query, params).fetchall()
+
+        # Group by server
+        servers: dict[str, list[dict]] = {}
+        for r in rows:
+            name = r["server_name"]
+            servers.setdefault(name, []).append({
+                "calls": r["calls"],
+                "elapsed_ms": r["elapsed_ms"],
+                "result_size": r["result_size"],
+            })
+
+        results = []
+        for srv, sessions in sorted(servers.items()):
+            n = len(sessions)
+            calls = sorted(s["calls"] for s in sessions)
+            elapsed = sorted(s["elapsed_ms"] for s in sessions)
+            sizes = sorted(s["result_size"] for s in sessions)
+
+            results.append(ServerDistribution(
+                server_name=srv,
+                session_count=n,
+                p50_calls=_percentile(calls, 50),
+                p90_calls=_percentile(calls, 90),
+                p99_calls=_percentile(calls, 99),
+                p50_elapsed_ms=_percentile(elapsed, 50),
+                p90_elapsed_ms=_percentile(elapsed, 90),
+                p99_elapsed_ms=_percentile(elapsed, 99),
+                p50_result_bytes=_percentile(sizes, 50),
+                p90_result_bytes=_percentile(sizes, 90),
+                p99_result_bytes=_percentile(sizes, 99),
+            ))
+
+        return results
+
+
+def _percentile(sorted_values: list[int], pct: int) -> int:
+    """Compute the nearest-rank percentile from a sorted list."""
+    if not sorted_values:
+        return 0
+    import math
+    rank = math.ceil(pct / 100 * len(sorted_values))
+    return sorted_values[max(0, rank - 1)]
