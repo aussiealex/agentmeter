@@ -114,8 +114,17 @@ Patterns that cause subtle bugs if an agent doesn't know about them:
 
 ## Pending Enhancements
 
-Check `/media/aa/LargeBackup/MainApps/_playbook/actionables.md` for
-digest-sourced action items tagged to this project.
+At session start, read `/media/aa/LargeBackup/MainApps/_playbook/actionables.md`
+and briefly list pending items tagged to this project (count + top 3).
+Don't block on this — just surface them so the user knows what's queued.
+
+## Session Handoff
+
+If `.handoff.md` exists in the project root, read it before doing anything
+else — it contains context from a prior session's unfinished work. When
+ending a session mid-task, write `.handoff.md` following the protocol in
+`/media/aa/LargeBackup/MainApps/_playbook/session-handoff-protocol.md`.
+Delete it when the task is complete.
 
 ## Constraints
 
