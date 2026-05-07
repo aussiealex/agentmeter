@@ -8,6 +8,15 @@ economics layer for MCP agents.
 
 **Tagline:** "Know what your agents cost."
 
+## Business Role: Long-Term Bet (Priority #3)
+
+At session start, read `/media/aa/LargeBackup/MainApps/_playbook/session-start.md`
+and follow its instructions. This project is Priority #3 — only after revenue
+and beta test are unblocked.
+
+Read `/media/aa/LargeBackup/MainApps/_playbook/business-thesis.md` for full
+strategy context.
+
 ## Architecture
 
 ```

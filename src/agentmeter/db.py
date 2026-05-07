@@ -125,6 +125,19 @@ class MeterDB:
         )
         self._conn.commit()
 
+    def ensure_session(self, session: Session) -> None:
+        """Create session if it doesn't exist. Idempotent for hook use."""
+        self._conn.execute(
+            "INSERT OR IGNORE INTO session "
+            "(id, server_name, server_command, started_at) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                session.id, session.server_name,
+                session.server_command, session.started_at,
+            ),
+        )
+        self._conn.commit()
+
     def end_session(self, session_id: str, total_calls: int) -> None:
         name = self._generate_session_name(session_id, total_calls)
         self._conn.execute(
@@ -142,6 +155,27 @@ class MeterDB:
         )
         self._conn.commit()
         return cursor.rowcount > 0
+
+    def get_sessions(self, limit: int = 20) -> list[Session]:
+        """Get recent sessions ordered by start time."""
+        rows = self._conn.execute(
+            "SELECT id, name, server_name, server_command, started_at, "
+            "ended_at, total_calls FROM session "
+            "ORDER BY started_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [
+            Session(
+                id=r["id"],
+                name=r["name"],
+                server_name=r["server_name"],
+                server_command=r["server_command"],
+                started_at=r["started_at"],
+                ended_at=r["ended_at"],
+                total_calls=r["total_calls"],
+            )
+            for r in rows
+        ]
 
     def _generate_session_name(
         self, session_id: str, total_calls: int,
