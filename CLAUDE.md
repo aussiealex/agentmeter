@@ -61,7 +61,20 @@ src/agentmeter/
 ├── __main__.py          # python -m agentmeter entry point
 ├── proxy.py             # MCP proxy core (Path 2)
 ├── models.py            # Dataclasses: ToolCall, Session, NormalisedToolEvent, etc.
-├── cli.py               # CLI: wrap, stats, sessions, calls, daily, rename, rates
+├── cli.py               # CLI core: wrap, stats, sessions, calls, daily, rename, backfill
+├── cli_advise.py        # Spend analysis and recommendations
+├── cli_budget.py        # Budget CLI subgroup
+├── cli_breaker.py       # Circuit breaker CLI subgroup
+├── cli_cost.py          # Real token cost per session with breakdown
+├── cli_export.py        # JSONL export of tool call data
+├── cli_forecast.py      # Monthly spend projection
+├── cli_format.py        # Output formatting helpers
+├── cli_hook.py          # Hook install/status CLI
+├── cli_rates.py         # Rate card view/edit
+├── cli_strategy.py      # Per-project cost analysis and advice
+├── cli_summary.py       # Compact cost context for agent injection
+├── outcomes.py          # Session outcome detection from Bash calls
+├── session_reader.py    # Read real tokens from Claude Code JSONL
 ├── hook.py              # Legacy entry point (imports from hooks/claude.py)
 ├── hooks/               # Multi-agent hook system (Path 1)
 │   ├── __init__.py      # Re-exports, backwards compat
@@ -72,13 +85,14 @@ src/agentmeter/
 │   └── copilot.py       # Copilot CLI postToolUse adapter
 └── db/                  # Database layer (split by domain)
     ├── __init__.py      # MeterDB class, re-exports
+    ├── _helpers.py      # build_where() for safe query construction
     ├── schema.py        # Schema DDL, migrations, connection setup
-    ├── sessions.py      # Session CRUD + auto-naming
-    ├── calls.py         # Tool call recording + queries
+    ├── sessions.py      # Session CRUD + auto-naming + outcomes
+    ├── calls.py         # Tool call recording + queries + export
     ├── budget.py        # Budget CRUD + checking
     ├── breaker.py       # Circuit breaker CRUD + trips
     ├── rates.py         # Rate card CRUD
-    └── analytics.py     # Distribution, aggregates, cost estimation
+    └── analytics.py     # Distribution, aggregates, project stats
 tests/
 ├── conftest.py          # Shared fixtures (tmp_db, test_server_path)
 ├── test_db.py           # DB unit tests (positive)
@@ -87,6 +101,7 @@ tests/
 ├── test_cli.py          # CLI command tests via CliRunner
 ├── test_hooks.py        # Hook adapter tests (all agents)
 ├── test_integration.py  # End-to-end proxy tests (pytest)
+├── test_outcomes.py     # Session outcome detection tests
 ├── test_proxy.py        # Standalone integration test (manual)
 ├── test_server.py       # Minimal MCP server for testing
 └── TEST_STRATEGY.md     # Test strategy with deferred test triggers
@@ -108,8 +123,21 @@ agentmeter stats --all        # all time
 agentmeter stats --week       # this week
 agentmeter calls              # recent individual calls
 agentmeter calls --tool add   # filter by tool name
-agentmeter sessions           # session breakdowns
+agentmeter sessions           # session breakdowns with outcomes
 agentmeter daily              # daily totals with bar chart
+
+# Cost analysis (real token data from Claude Code JSONL)
+agentmeter cost               # recent sessions with token breakdown
+agentmeter cost <session-id>  # detailed breakdown (partial ID works)
+agentmeter forecast           # monthly spend projection
+agentmeter advise             # spend analysis + recommendations
+agentmeter strategy           # per-project cost analysis + advice
+agentmeter summary            # compact cost context for agent injection
+
+# Data export
+agentmeter export             # JSONL to stdout
+agentmeter export --tool Read --since 2026-05-01 --limit 100
+agentmeter backfill           # detect outcomes in historical sessions
 
 # Budget enforcement
 agentmeter budget set session 50          # max 50 calls per session
@@ -191,7 +219,9 @@ Delete it when the task is complete.
 - Hooks are a hot path (<5ms). Minimal imports, no network calls, no file reads
   beyond the DB. stdlib + agentmeter.db only.
 - If a hook fails, exit cleanly. The agent's work is more important than metering.
-- No stdout pollution — agents parse stdout. Diagnostics go to stderr only.
+- Hook stdout/stderr is not visible to agents — tested 2026-05-18. Claude Code
+  silently discards PostToolUse hook output. Diagnostics go to stderr for
+  terminal visibility only.
 
 ### Backwards compatibility
 - `python3 -m agentmeter.hook` must keep working forever (installed in users'
