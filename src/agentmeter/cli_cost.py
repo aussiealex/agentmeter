@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import click
 
-from agentmeter.cli_format import format_bytes
 from agentmeter.db import MeterDB
 from agentmeter.session_reader import (
     calculate_session_cost,
@@ -48,7 +47,9 @@ def _show_session_cost(db: MeterDB, session_id: str) -> None:
     sessions = db.get_sessions(limit=100)
     session = None
     for s in sessions:
-        if s.id == session_id or (s.name and s.name == session_id):
+        if (s.id == session_id
+                or s.id.startswith(session_id)
+                or (s.name and s.name == session_id)):
             session = s
             break
 
@@ -171,7 +172,7 @@ def _show_recent_costs(db: MeterDB, limit: int) -> None:
 
         click.echo(
             f"  {name:<35}  {project:<15}  "
-            f"{format_bytes(total_tokens * 4):>8}  "
+            f"{total_tokens:>12,} tok  "
             f"${cost_data.total_cost:>8.2f}"
         )
         any_cost = True
