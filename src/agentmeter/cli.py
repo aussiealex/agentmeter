@@ -6,11 +6,14 @@ from datetime import datetime, timedelta
 
 import click
 
+from agentmeter.cli_advise import advise
 from agentmeter.cli_breaker import breaker
 from agentmeter.cli_budget import budget
 from agentmeter.cli_cost import cost
+from agentmeter.cli_forecast import forecast
 from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
 from agentmeter.cli_hook import hook
+from agentmeter.cli_rates import rates
 from agentmeter.db import MeterDB
 
 
@@ -20,10 +23,13 @@ def main() -> None:
     """AgentMeter — meter every MCP tool call."""
 
 
+main.add_command(advise)
 main.add_command(budget)
 main.add_command(breaker)
 main.add_command(cost)
+main.add_command(forecast)
 main.add_command(hook)
+main.add_command(rates)
 
 
 @main.command(context_settings={"ignore_unknown_options": True})
@@ -134,7 +140,13 @@ def sessions(limit: int) -> None:
 @main.command()
 @click.option("--days", "-d", default=7, help="Number of days to show.")
 def daily(days: int) -> None:
-    """Show daily call totals."""
+    """Show daily call totals with cost when available."""
+    from agentmeter.session_reader import (
+        calculate_session_cost,
+        find_session_jsonl,
+        read_session_tokens_from_file,
+    )
+
     db = MeterDB()
     totals = db.get_daily_totals(days=days)
 
@@ -143,20 +155,46 @@ def daily(days: int) -> None:
         db.close()
         return
 
+    # Build daily cost map from real token data
+    daily_costs: dict[str, float] = {}
+    sessions = db.get_sessions(limit=200)
+    for session in sessions:
+        jsonl_path = find_session_jsonl(session.id, session.server_command)
+        if not jsonl_path:
+            continue
+        tokens = read_session_tokens_from_file(jsonl_path)
+        if not tokens or tokens.llm_call_count == 0:
+            continue
+        rate = db.get_rate(tokens.model_id)
+        if not rate:
+            continue
+        cost_data = calculate_session_cost(tokens, rate)
+        day = session.started_at[:10]
+        daily_costs[day] = daily_costs.get(day, 0) + cost_data.total_cost
+
+    has_costs = bool(daily_costs)
+
     click.echo()
     click.echo(f"  Daily Totals (last {days} days)")
-    click.echo(f"  {'─' * 50}")
+    click.echo(f"  {'─' * 60}")
 
     max_calls = max(t.call_count for t in totals) if totals else 1
 
     for t in totals:
-        bar_len = int((t.call_count / max_calls) * 30) if max_calls > 0 else 0
+        bar_len = int((t.call_count / max_calls) * 25) if max_calls > 0 else 0
         bar = "█" * bar_len
         err_str = f" ({t.error_count} err)" if t.error_count else ""
+        cost_str = ""
+        if has_costs and t.day in daily_costs:
+            cost_str = f"  ${daily_costs[t.day]:>8.2f}"
         click.echo(
-            f"  {t.day}  {bar}  {t.call_count} calls{err_str}  "
-            f"{format_ms(t.total_elapsed_ms)}"
+            f"  {t.day}  {bar}  {t.call_count:>4} calls{err_str}{cost_str}"
         )
+
+    if has_costs:
+        total_cost = sum(daily_costs.values())
+        click.echo(f"  {'─' * 60}")
+        click.echo(f"  {'Total cost (API rates)':>46}  ${total_cost:>8.2f}")
 
     click.echo()
     db.close()
