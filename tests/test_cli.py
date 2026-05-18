@@ -408,13 +408,13 @@ class TestStrategyCommand:
         assert result.exit_code == 0
         assert "No project-tagged" in result.output
 
-    def test_strategy_no_project_tags(
+    def test_strategy_backfilled_projects(
         self, cli_runner: CliRunner, seeded_db: Path,
     ) -> None:
-        """seeded_db has calls but no project tags — should show no data."""
+        """seeded_db has server_command — backfill extracts project."""
         result = _invoke(cli_runner, ["strategy"], seeded_db)
         assert result.exit_code == 0
-        assert "No project-tagged" in result.output
+        assert "Strategy Report" in result.output
 
     def test_strategy_custom_days(
         self, cli_runner: CliRunner, project_db: Path,

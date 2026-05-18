@@ -103,6 +103,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if col not in tc_cols:
             conn.execute(f"ALTER TABLE tool_call ADD COLUMN {ddl}")
 
+    # Backfill project column from session.server_command for old rows
+    _backfill_project(conn)
+
     # Seed default rate card if empty
     count = conn.execute("SELECT COUNT(*) FROM rate_card").fetchone()[0]
     if count == 0:
@@ -115,6 +118,37 @@ _TOOL_CALL_MIGRATIONS = [
     ("model_id", "model_id TEXT NOT NULL DEFAULT ''"),
     ("input_size", "input_size INTEGER NOT NULL DEFAULT 0"),
 ]
+
+
+def _backfill_project(conn: sqlite3.Connection) -> None:
+    """Backfill project column from session.server_command.
+
+    Older hook data recorded server_command (cwd) but didn't set
+    the project column. Extract the directory name from the path.
+    Only touches rows where project is empty.
+    """
+    # Quick check — skip if no empty project rows
+    count = conn.execute(
+        "SELECT COUNT(*) FROM tool_call WHERE project = ''",
+    ).fetchone()[0]
+    if count == 0:
+        return
+
+    rows = conn.execute(
+        "SELECT tc.id, s.server_command "
+        "FROM tool_call tc "
+        "JOIN session s ON s.id = tc.session_id "
+        "WHERE tc.project = '' AND s.server_command != ''",
+    ).fetchall()
+
+    for r in rows:
+        path = r["server_command"].rstrip("/")
+        project = path.rsplit("/", 1)[-1] if "/" in path else path
+        if project:
+            conn.execute(
+                "UPDATE tool_call SET project = ? WHERE id = ?",
+                (project, r["id"]),
+            )
 
 
 def _seed_default_rates(conn: sqlite3.Connection) -> None:
