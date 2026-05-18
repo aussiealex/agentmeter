@@ -21,6 +21,10 @@ class ToolCall:
     started_at: str = ""
     elapsed_ms: int = 0
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    agent: str = ""
+    project: str = ""
+    model_id: str = ""
+    input_size: int = 0
 
 
 @dataclass
@@ -77,6 +81,18 @@ class ServerDistribution:
     p50_result_bytes: int = 0
     p90_result_bytes: int = 0
     p99_result_bytes: int = 0
+
+
+@dataclass
+class ProjectStats:
+    """Aggregated stats for a single project."""
+
+    project: str = ""
+    call_count: int = 0
+    error_count: int = 0
+    total_elapsed_ms: int = 0
+    first_call: str = ""
+    last_call: str = ""
 
 
 @dataclass

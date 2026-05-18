@@ -20,6 +20,7 @@ from agentmeter.models import (
     BreakerTrip,
     Budget,
     DailyTotal,
+    ProjectStats,
     RateCard,
     ServerDistribution,
     Session,
@@ -88,6 +89,17 @@ class MeterDB:
 
     def get_total_calls(self, since: str | None = None) -> int:
         return calls.get_total_calls(self._conn, since)
+
+    def get_calls_for_export(
+        self,
+        since: str | None = None,
+        tool_name: str | None = None,
+        session_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[ToolCall]:
+        return calls.get_calls_for_export(
+            self._conn, since, tool_name, session_id, limit,
+        )
 
     # ── Budget operations ───────────────────────────────────────────
 
@@ -166,6 +178,20 @@ class MeterDB:
         server_name: str | None = None,
     ) -> list[ServerDistribution]:
         return analytics.get_session_distribution(self._conn, server_name)
+
+    # ── Project analytics ──────────────────────────────────────────────
+
+    def get_project_stats(
+        self, since: str | None = None,
+    ) -> list[ProjectStats]:
+        return analytics.get_project_stats(self._conn, since)
+
+    def get_project_tool_breakdown(
+        self, project: str, since: str | None = None,
+    ) -> list[ToolStats]:
+        return analytics.get_project_tool_breakdown(
+            self._conn, project, since,
+        )
 
     # ── Rate card operations ─────────────────────────────────────────
 

@@ -8,12 +8,33 @@ from agentmeter.db._helpers import build_where
 from agentmeter.models import ToolCall, ToolStats
 
 
+def _row_to_tool_call(r: sqlite3.Row) -> ToolCall:
+    return ToolCall(
+        id=r["id"],
+        session_id=r["session_id"],
+        server_name=r["server_name"],
+        tool_name=r["tool_name"],
+        arguments_json=r["arguments_json"],
+        result_json=r["result_json"],
+        result_size=r["result_size"],
+        is_error=bool(r["is_error"]),
+        started_at=r["started_at"],
+        elapsed_ms=r["elapsed_ms"],
+        created_at=r["created_at"],
+        agent=r["agent"],
+        project=r["project"],
+        model_id=r["model_id"],
+        input_size=r["input_size"],
+    )
+
+
 def record_call(conn: sqlite3.Connection, call: ToolCall) -> None:
     conn.execute(
         "INSERT INTO tool_call "
         "(session_id, server_name, tool_name, arguments_json, result_json, "
-        "result_size, is_error, started_at, elapsed_ms, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "result_size, is_error, started_at, elapsed_ms, created_at, "
+        "agent, project, model_id, input_size) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             call.session_id,
             call.server_name,
@@ -25,6 +46,10 @@ def record_call(conn: sqlite3.Connection, call: ToolCall) -> None:
             call.started_at,
             call.elapsed_ms,
             call.created_at,
+            call.agent,
+            call.project,
+            call.model_id,
+            call.input_size,
         ),
     )
     conn.commit()
@@ -98,22 +123,40 @@ def get_recent_calls(
 
     rows = conn.execute(query, params).fetchall()
 
-    return [
-        ToolCall(
-            id=r["id"],
-            session_id=r["session_id"],
-            server_name=r["server_name"],
-            tool_name=r["tool_name"],
-            arguments_json=r["arguments_json"],
-            result_json=r["result_json"],
-            result_size=r["result_size"],
-            is_error=bool(r["is_error"]),
-            started_at=r["started_at"],
-            elapsed_ms=r["elapsed_ms"],
-            created_at=r["created_at"],
-        )
-        for r in rows
-    ]
+    return [_row_to_tool_call(r) for r in rows]
+
+
+def get_calls_for_export(
+    conn: sqlite3.Connection,
+    since: str | None = None,
+    tool_name: str | None = None,
+    session_id: str | None = None,
+    limit: int | None = None,
+) -> list[ToolCall]:
+    """Get tool calls for JSONL export, with optional filters."""
+    clauses: list[str] = []
+    params: list = []
+
+    if since:
+        clauses.append("created_at >= ?")
+        params.append(since)
+    if tool_name:
+        clauses.append("tool_name = ?")
+        params.append(tool_name)
+    if session_id:
+        clauses.append("session_id = ?")
+        params.append(session_id)
+
+    where = build_where(clauses)
+    query = "SELECT * FROM tool_call " + where + " ORDER BY created_at ASC"
+
+    if limit:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    rows = conn.execute(query, params).fetchall()
+
+    return [_row_to_tool_call(r) for r in rows]
 
 
 def get_total_calls(

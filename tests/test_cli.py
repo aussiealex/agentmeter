@@ -254,3 +254,179 @@ class TestFormattingEdgeCases:
     ) -> None:
         result = _invoke(cli_runner, ["daily"], seeded_db)
         assert "█" in result.output
+
+
+# ── Export command ─────────────────────────────────────────────────
+
+
+class TestExportCommand:
+    def test_export_jsonl(self, cli_runner: CliRunner, seeded_db: Path) -> None:
+        import json
+        result = _invoke(cli_runner, ["export"], seeded_db)
+        assert result.exit_code == 0
+        lines = [x for x in result.output.strip().split("\n") if x]
+        assert len(lines) == 4
+        # Each line must be valid JSON
+        for line in lines:
+            obj = json.loads(line)
+            assert "tool_name" in obj
+            assert "session_id" in obj
+            assert "started_at" in obj
+
+    def test_export_filter_by_tool(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        import json
+        result = _invoke(cli_runner, ["export", "--tool", "search"], seeded_db)
+        assert result.exit_code == 0
+        lines = [x for x in result.output.strip().split("\n") if x]
+        assert len(lines) == 2
+        for line in lines:
+            obj = json.loads(line)
+            assert obj["tool_name"] == "search"
+
+    def test_export_filter_by_session(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        import json
+        result = _invoke(
+            cli_runner, ["export", "--session", "sess-001"], seeded_db,
+        )
+        assert result.exit_code == 0
+        lines = [x for x in result.output.strip().split("\n") if x]
+        assert len(lines) == 4
+        for line in lines:
+            obj = json.loads(line)
+            assert obj["session_id"] == "sess-001"
+
+    def test_export_limit(self, cli_runner: CliRunner, seeded_db: Path) -> None:
+        result = _invoke(cli_runner, ["export", "--limit", "2"], seeded_db)
+        assert result.exit_code == 0
+        lines = [x for x in result.output.strip().split("\n") if x]
+        assert len(lines) == 2
+
+    def test_export_empty_db(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        db_path = tmp_path / "empty.db"
+        MeterDB(db_path).close()
+        result = _invoke(cli_runner, ["export"], db_path)
+        assert result.exit_code == 0
+        assert result.output.strip() == ""
+
+    def test_export_no_result_json(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        """Export deliberately excludes result_json to keep output size sane."""
+        import json
+        result = _invoke(cli_runner, ["export", "--limit", "1"], seeded_db)
+        obj = json.loads(result.output.strip())
+        assert "result_json" not in obj
+        assert "result_size" in obj
+        assert "agent" in obj
+        assert "project" in obj
+        assert "model_id" in obj
+
+
+# ── Strategy command ───────────────────────────────────────────────
+
+
+@pytest.fixture
+def project_db(tmp_path: Path) -> Path:
+    """Create a DB with project-tagged tool calls across multiple projects."""
+    db_path = tmp_path / "project.db"
+    db = MeterDB(db_path)
+
+    session = Session(
+        id="sess-proj",
+        server_name="claude-code",
+        server_command="claude",
+        started_at=datetime.now().isoformat(),
+    )
+    db.create_session(session)
+
+    # Simulate calls across different projects
+    projects = [
+        ("AgentMeter", 10),
+        ("ComplyIT", 3),
+        ("MailSift", 5),
+        ("Politicks", 8),
+    ]
+    for project, count in projects:
+        for _i in range(count):
+            call = ToolCall(
+                session_id="sess-proj",
+                server_name="claude-code",
+                tool_name="Read",
+                arguments_json=f'{{"file": "/path/to/{project}/src/main.py"}}',
+                result_json="content",
+                result_size=100,
+                is_error=False,
+                started_at=datetime.now().isoformat(),
+                elapsed_ms=50,
+            )
+            db.record_call(call)
+            # Tag the project column directly
+            db._conn.execute(
+                "UPDATE tool_call SET project = ? "
+                "WHERE id = (SELECT MAX(id) FROM tool_call)",
+                (project,),
+            )
+            db._conn.commit()
+
+    db.end_session("sess-proj", total_calls=26)
+    db.close()
+    return db_path
+
+
+class TestStrategyCommand:
+    def test_strategy_shows_projects_and_roles(
+        self, cli_runner: CliRunner, project_db: Path,
+    ) -> None:
+        result = _invoke(cli_runner, ["strategy"], project_db)
+        assert result.exit_code == 0
+        assert "Strategy Report" in result.output
+        assert "AgentMeter" in result.output
+        assert "ComplyIT" in result.output
+        assert "Long-Term Bet" in result.output
+        assert "Revenue Engine" in result.output
+        assert "Personal" in result.output
+
+    def test_strategy_shows_tool_breakdown(
+        self, cli_runner: CliRunner, project_db: Path,
+    ) -> None:
+        result = _invoke(cli_runner, ["strategy"], project_db)
+        assert result.exit_code == 0
+        assert "tool calls" in result.output
+        assert "Top tools" in result.output
+        assert "Read" in result.output
+
+    def test_strategy_empty_db(
+        self, cli_runner: CliRunner, tmp_path: Path,
+    ) -> None:
+        db_path = tmp_path / "empty.db"
+        MeterDB(db_path).close()
+        result = _invoke(cli_runner, ["strategy"], db_path)
+        assert result.exit_code == 0
+        assert "No project-tagged" in result.output
+
+    def test_strategy_no_project_tags(
+        self, cli_runner: CliRunner, seeded_db: Path,
+    ) -> None:
+        """seeded_db has calls but no project tags — should show no data."""
+        result = _invoke(cli_runner, ["strategy"], seeded_db)
+        assert result.exit_code == 0
+        assert "No project-tagged" in result.output
+
+    def test_strategy_custom_days(
+        self, cli_runner: CliRunner, project_db: Path,
+    ) -> None:
+        result = _invoke(cli_runner, ["strategy", "--days", "1"], project_db)
+        assert result.exit_code == 0
+        assert "last 1 days" in result.output
+
+    def test_strategy_shows_all_projects(
+        self, cli_runner: CliRunner, project_db: Path,
+    ) -> None:
+        result = _invoke(cli_runner, ["strategy"], project_db)
+        assert result.exit_code == 0
+        assert "Politicks" in result.output
+        assert "MailSift" in result.output

@@ -39,6 +39,10 @@ def record_event(event: NormalisedToolEvent) -> None:
                 is_error=event.result_type != "success",
                 started_at=event.timestamp,
                 elapsed_ms=event.elapsed_ms,
+                agent=event.agent,
+                project=event.project,
+                model_id=event.model_id,
+                input_size=event.input_size,
             ),
         )
     except Exception as exc:

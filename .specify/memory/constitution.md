@@ -119,7 +119,13 @@ src/agentmeter/
 ├── cli.py               # Core CLI commands
 ├── cli_budget.py        # Budget CLI subgroup
 ├── cli_breaker.py       # Breaker CLI subgroup
+├── cli_cost.py          # Real token cost per session
+├── cli_export.py        # JSONL export of tool call data
+├── cli_forecast.py      # Monthly spend projection
+├── cli_advise.py        # Spend analysis and recommendations
+├── cli_strategy.py      # Per-project cost analysis and advice
 ├── cli_hook.py          # Hook install/status CLI
+├── cli_rates.py         # Rate card view/edit
 ├── cli_format.py        # Output formatting helpers
 ├── proxy.py             # MCP transparent proxy
 ├── models.py            # All dataclasses

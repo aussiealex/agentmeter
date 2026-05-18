@@ -10,10 +10,12 @@ from agentmeter.cli_advise import advise
 from agentmeter.cli_breaker import breaker
 from agentmeter.cli_budget import budget
 from agentmeter.cli_cost import cost
+from agentmeter.cli_export import export
 from agentmeter.cli_forecast import forecast
 from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
 from agentmeter.cli_hook import hook
 from agentmeter.cli_rates import rates
+from agentmeter.cli_strategy import strategy
 from agentmeter.db import MeterDB
 
 
@@ -27,9 +29,11 @@ main.add_command(advise)
 main.add_command(budget)
 main.add_command(breaker)
 main.add_command(cost)
+main.add_command(export)
 main.add_command(forecast)
 main.add_command(hook)
 main.add_command(rates)
+main.add_command(strategy)
 
 
 @main.command(context_settings={"ignore_unknown_options": True})
