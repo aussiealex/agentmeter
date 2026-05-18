@@ -123,8 +123,8 @@ Patterns that cause subtle bugs if an agent doesn't know about them:
 
 ## Pending Enhancements
 
-At session start, read `/media/aa/LargeBackup/MainApps/_playbook/actionables.md`
-and briefly list pending items tagged to this project (count + top 3).
+At session start, read `/media/aa/LargeBackup/MainApps/_playbook/actionables-agentmeter.md`
+and briefly list pending items (count + top 3).
 Don't block on this — just surface them so the user knows what's queued.
 
 ## Session Handoff
