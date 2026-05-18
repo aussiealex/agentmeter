@@ -159,7 +159,11 @@ Hooks are a hot path — they fire on every tool call in every agent session.
 
 - **<5ms total overhead** — minimal imports, no network, no file reads beyond DB
 - **stdlib + agentmeter.db only** — no heavy third-party imports
-- **Never write to stdout** — agents parse stdout. Diagnostics go to stderr only.
+- **Hook output is not visible to agents** — tested 2026-05-18: Claude Code
+  does not surface PostToolUse hook stdout or stderr to the agent context.
+  Hook output is silently discarded. This means hooks cannot inject mid-session
+  cost warnings. Diagnostics should still go to stderr for user visibility in
+  terminal logs.
 - **Never raise** — catch all exceptions, log to stderr, exit 0
 - **Skip `mcp__*` tools** — prevents double-counting with proxy path
 
@@ -322,7 +326,7 @@ python3 -m pytest tests/ -v             # All tests must pass
 
 - "Storing computed costs in the DB" → NO, derive at query time from rate card
 - "Adding a heavy import to a hook adapter" → NO, hooks must be <5ms
-- "Writing to stdout from a hook" → NO, agents parse stdout, use stderr
+- "Assuming hook stdout reaches the agent" → NO, tested and confirmed it doesn't
 - "Dropping a DB column in a migration" → NO, additive only
 - "Breaking `python3 -m agentmeter.hook`" → NO, permanent backwards compat
 - "Using f-strings in SQL queries" → NO, parameterised `?` only
