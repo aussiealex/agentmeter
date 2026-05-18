@@ -38,6 +38,11 @@ class Session:
     name: str = ""
     ended_at: str | None = None
     total_calls: int = 0
+    commits: int = 0
+    files_changed: int = 0
+    tests_passed: int = 0
+    tests_failed: int = 0
+    outcome: str = ""  # derived: committed, tested, failed, no-output
 
 
 @dataclass

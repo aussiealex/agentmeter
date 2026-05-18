@@ -94,6 +94,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE session ADD COLUMN name TEXT NOT NULL DEFAULT ''"
         )
 
+    # Session outcome columns (added 2026-05-18)
+    for col, ddl in _SESSION_MIGRATIONS:
+        if col not in session_cols:
+            conn.execute(f"ALTER TABLE session ADD COLUMN {ddl}")
+
     # Multi-agent foundation columns (added 2026-05-18)
     tc_cols = {
         r[1]
@@ -111,6 +116,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if count == 0:
         _seed_default_rates(conn)
 
+
+_SESSION_MIGRATIONS = [
+    ("commits", "commits INTEGER NOT NULL DEFAULT 0"),
+    ("files_changed", "files_changed INTEGER NOT NULL DEFAULT 0"),
+    ("tests_passed", "tests_passed INTEGER NOT NULL DEFAULT 0"),
+    ("tests_failed", "tests_failed INTEGER NOT NULL DEFAULT 0"),
+]
 
 _TOOL_CALL_MIGRATIONS = [
     ("agent", "agent TEXT NOT NULL DEFAULT ''"),

@@ -64,22 +64,71 @@ def get_sessions(
     """Get recent sessions ordered by start time."""
     rows = conn.execute(
         "SELECT id, name, server_name, server_command, started_at, "
-        "ended_at, total_calls FROM session "
+        "ended_at, total_calls, commits, files_changed, "
+        "tests_passed, tests_failed FROM session "
         "ORDER BY started_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    return [
-        Session(
-            id=r["id"],
-            name=r["name"],
-            server_name=r["server_name"],
-            server_command=r["server_command"],
-            started_at=r["started_at"],
-            ended_at=r["ended_at"],
-            total_calls=r["total_calls"],
-        )
-        for r in rows
-    ]
+    return [_row_to_session(r) for r in rows]
+
+
+def update_session_outcome(
+    conn: sqlite3.Connection,
+    session_id: str,
+    commits: int,
+    files_changed: int,
+    tests_passed: int,
+    tests_failed: int,
+) -> bool:
+    """Update session with outcome data. Returns True if found."""
+    cursor = conn.execute(
+        "UPDATE session SET commits = ?, files_changed = ?, "
+        "tests_passed = ?, tests_failed = ? WHERE id = ?",
+        (commits, files_changed, tests_passed, tests_failed,
+         session_id),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+def _row_to_session(r: sqlite3.Row) -> Session:
+    # Migration columns always exist after init_schema()
+    commits = r["commits"]
+    files_changed = r["files_changed"]
+    tests_passed = r["tests_passed"]
+    tests_failed = r["tests_failed"]
+    outcome = _derive_outcome(
+        commits, tests_passed, tests_failed,
+    )
+    return Session(
+        id=r["id"],
+        name=r["name"],
+        server_name=r["server_name"],
+        server_command=r["server_command"],
+        started_at=r["started_at"],
+        ended_at=r["ended_at"],
+        total_calls=r["total_calls"],
+        commits=commits,
+        files_changed=files_changed,
+        tests_passed=tests_passed,
+        tests_failed=tests_failed,
+        outcome=outcome,
+    )
+
+
+def _derive_outcome(
+    commits: int, tests_passed: int, tests_failed: int,
+) -> str:
+    """Derive a human-readable outcome label from facts."""
+    if tests_failed > 0:
+        return "failed"
+    if tests_passed > 0 and commits > 0:
+        return "tested+committed"
+    if tests_passed > 0:
+        return "tested"
+    if commits > 0:
+        return "committed"
+    return ""
 
 
 def _generate_session_name(

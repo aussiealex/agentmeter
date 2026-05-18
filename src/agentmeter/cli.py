@@ -111,7 +111,7 @@ def stats(period: str | None, server: str | None, distribution: bool) -> None:
 @main.command()
 @click.option("--limit", "-l", default=10, help="Number of sessions to show.")
 def sessions(limit: int) -> None:
-    """Show recent sessions with tool breakdowns."""
+    """Show recent sessions with tool breakdowns and outcomes."""
     db = MeterDB()
     session_stats = db.get_session_stats(limit=limit)
 
@@ -119,6 +119,10 @@ def sessions(limit: int) -> None:
         click.echo("\n  No sessions recorded.\n")
         db.close()
         return
+
+    # Build outcome lookup from session table
+    raw_sessions = db.get_sessions(limit=limit * 2)
+    outcomes = {s.id: s for s in raw_sessions}
 
     for ss in session_stats:
         click.echo()
@@ -131,14 +135,46 @@ def sessions(limit: int) -> None:
         else:
             click.echo("  No tool calls in this session.")
 
-        click.echo(
+        summary = (
             f"  Total: {ss.total_calls} calls | "
             f"{ss.total_errors} errors | "
             f"{format_ms(ss.total_elapsed_ms)}"
         )
 
+        # Append outcome if available
+        s = outcomes.get(ss.session_id)
+        if s and s.outcome:
+            parts = []
+            if s.commits:
+                parts.append(f"{s.commits} commits")
+            if s.files_changed:
+                parts.append(f"{s.files_changed} files")
+            if s.tests_passed:
+                parts.append(f"{s.tests_passed} passed")
+            if s.tests_failed:
+                parts.append(f"{s.tests_failed} failed")
+            if parts:
+                summary += f" | {', '.join(parts)}"
+
+        click.echo(summary)
+
     click.echo()
     db.close()
+
+
+@main.command()
+def backfill() -> None:
+    """Backfill session outcomes from historical tool call data.
+
+    Scans Bash calls for git commits and test results, then
+    updates session rows with the detected outcomes.
+    """
+    from agentmeter.outcomes import backfill_outcomes
+
+    db = MeterDB()
+    updated = backfill_outcomes(db)
+    db.close()
+    click.echo(f"  Updated {updated} sessions with outcome data.")
 
 
 @main.command()

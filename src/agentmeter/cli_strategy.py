@@ -71,6 +71,8 @@ class _ProjectData:
     __slots__ = (
         "name", "role", "priority", "tools",
         "sessions", "call_count",
+        "commits", "files_changed",
+        "tests_passed", "tests_failed",
     )
 
     def __init__(
@@ -83,6 +85,10 @@ class _ProjectData:
         self.tools = tools
         self.call_count = call_count
         self.sessions: list[_SessionData] = []
+        self.commits = 0
+        self.files_changed = 0
+        self.tests_passed = 0
+        self.tests_failed = 0
 
     @property
     def total_cost(self) -> float:
@@ -181,11 +187,21 @@ def strategy(days: int) -> None:
         )
         proj_map[ps.project] = pd
 
-    # Attach real session cost data
+    # Attach real session cost + outcome data
     sessions = db.get_sessions(limit=500)
     for session in sessions:
         if session.started_at < since:
             continue
+        project = session.server_command.rstrip("/").rsplit(
+            "/", 1,
+        )[-1]
+        if project in proj_map:
+            pd = proj_map[project]
+            pd.commits += session.commits
+            pd.files_changed += session.files_changed
+            pd.tests_passed += session.tests_passed
+            pd.tests_failed += session.tests_failed
+
         jsonl_path = find_session_jsonl(
             session.id, session.server_command,
         )
@@ -198,9 +214,6 @@ def strategy(days: int) -> None:
         if not rate:
             continue
         cost_data = calculate_session_cost(tokens, rate)
-        project = session.server_command.rstrip("/").rsplit(
-            "/", 1,
-        )[-1]
         if project in proj_map:
             proj_map[project].sessions.append(
                 _SessionData(session.id, tokens, cost_data),
@@ -296,6 +309,25 @@ def _print_project(
                     f"${cheapest:.2f} "
                     f"({most_expensive / cheapest:.0f}x)",
                 )
+
+    # Outcomes
+    has_outcomes = (
+        p.commits or p.tests_passed or p.tests_failed
+    )
+    if has_outcomes:
+        parts = []
+        if p.commits:
+            parts.append(f"{p.commits} commits")
+            if p.total_cost > 0 and p.commits > 0:
+                cpc = p.total_cost / p.commits
+                parts.append(f"${cpc:.2f}/commit")
+        if p.files_changed:
+            parts.append(f"{p.files_changed} files changed")
+        if p.tests_passed:
+            parts.append(f"{p.tests_passed} tests passed")
+        if p.tests_failed:
+            parts.append(f"{p.tests_failed} tests failed")
+        click.echo(f"    Outcomes: {', '.join(parts)}")
 
     # Tool breakdown (top 5 by data volume)
     if p.tools:

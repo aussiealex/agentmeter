@@ -68,6 +68,19 @@ class MeterDB:
     def get_sessions(self, limit: int = 20) -> list[Session]:
         return sessions.get_sessions(self._conn, limit)
 
+    def update_session_outcome(
+        self,
+        session_id: str,
+        commits: int,
+        files_changed: int,
+        tests_passed: int,
+        tests_failed: int,
+    ) -> bool:
+        return sessions.update_session_outcome(
+            self._conn, session_id,
+            commits, files_changed, tests_passed, tests_failed,
+        )
+
     # ── Tool call operations ────────────────────────────────────────
 
     def record_call(self, call: ToolCall) -> None:
