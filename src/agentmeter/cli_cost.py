@@ -137,20 +137,18 @@ def _show_session_cost(db: MeterDB, session_id: str) -> None:
 
 
 def _show_recent_costs(db: MeterDB, limit: int) -> None:
-    """Show cost summary for recent sessions."""
+    """Show detailed cost breakdown for recent sessions."""
     sessions = db.get_sessions(limit=limit)
 
     if not sessions:
         click.echo("\n  No sessions recorded.\n")
         return
 
-    click.echo()
-    click.echo("  Recent Session Costs")
-    click.echo(f"  {'─' * 70}")
-
     any_cost = False
     for session in sessions:
-        jsonl_path = find_session_jsonl(session.id, session.server_command)
+        jsonl_path = find_session_jsonl(
+            session.id, session.server_command,
+        )
         if not jsonl_path:
             continue
 
@@ -163,22 +161,83 @@ def _show_recent_costs(db: MeterDB, limit: int) -> None:
             continue
 
         cost_data = calculate_session_cost(tokens, rate)
-        project = session.server_command.rstrip("/").rsplit("/", 1)[-1]
-        name = session.name or session.id[:12]
+        project = session.server_command.rstrip("/").rsplit(
+            "/", 1,
+        )[-1]
         total_tokens = (
             tokens.input_tokens + tokens.cache_creation_tokens
             + tokens.cache_read_tokens + tokens.output_tokens
         )
 
-        click.echo(
-            f"  {name:<35}  {project:<15}  "
-            f"{total_tokens:>12,} tok  "
-            f"${cost_data.total_cost:>8.2f}"
+        # Percentages
+        cache_pct = _pct(tokens.cache_read_tokens, total_tokens)
+        create_pct = _pct(
+            tokens.cache_creation_tokens, total_tokens,
         )
+        output_pct = _pct(tokens.output_tokens, total_tokens)
+        input_pct = _pct(tokens.input_tokens, total_tokens)
+
+        # Timestamps
+        started = session.started_at[:19].replace("T", " ")
+        ended = ""
+        if session.ended_at:
+            ended = session.ended_at[:19].replace("T", " ")
+
+        # Outcomes
+        outcome_parts = []
+        if session.commits:
+            outcome_parts.append(f"{session.commits} commits")
+        if session.tests_passed:
+            outcome_parts.append(
+                f"{session.tests_passed} tests passed",
+            )
+        if session.tests_failed:
+            outcome_parts.append(
+                f"{session.tests_failed} tests failed",
+            )
+
+        click.echo()
+        click.echo(f"  {project}  —  ${cost_data.total_cost:.2f}"
+                    f"  ({total_tokens:,} tokens, "
+                    f"{tokens.llm_call_count} LLM calls)")
+        click.echo(f"  {'─' * 62}")
+        click.echo(f"    Session:  {session.id[:20]}")
+        click.echo(f"    Started:  {started}")
+        if ended:
+            click.echo(f"    Ended:    {ended}")
+        click.echo(
+            f"    Cache reads:     "
+            f"{tokens.cache_read_tokens:>12,}  "
+            f"({cache_pct:.0f}%)",
+        )
+        click.echo(
+            f"    Cache creation:  "
+            f"{tokens.cache_creation_tokens:>12,}  "
+            f"({create_pct:.0f}%)",
+        )
+        click.echo(
+            f"    Output:          "
+            f"{tokens.output_tokens:>12,}  "
+            f"({output_pct:.1f}%)",
+        )
+        click.echo(
+            f"    Input:           "
+            f"{tokens.input_tokens:>12,}  "
+            f"({input_pct:.1f}%)",
+        )
+        if outcome_parts:
+            click.echo(f"    Outcomes: {', '.join(outcome_parts)}")
+
         any_cost = True
 
     if not any_cost:
+        click.echo()
         click.echo("  No session transcripts found.")
-        click.echo("  (Cost data requires Claude Code with hook installed)")
+        click.echo("  (Cost data requires Claude Code "
+                    "with hook installed)")
 
     click.echo()
+
+
+def _pct(part: int, total: int) -> float:
+    return (part / total * 100) if total > 0 else 0
