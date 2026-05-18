@@ -1,5 +1,9 @@
 # CLAUDE.md — AgentMeter
 
+Read `.specify/memory/constitution.md` before doing anything in this project.
+It contains all project rules, architecture patterns, constraints, and the
+build philosophy.
+
 ## What This Is
 
 AgentMeter is the universal metering layer for AI coding agents. It captures
