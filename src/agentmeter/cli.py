@@ -16,6 +16,7 @@ from agentmeter.cli_format import format_ms, print_distribution, print_tool_tabl
 from agentmeter.cli_hook import hook
 from agentmeter.cli_rates import rates
 from agentmeter.cli_strategy import strategy
+from agentmeter.cli_summary import summary
 from agentmeter.db import MeterDB
 
 
@@ -34,6 +35,7 @@ main.add_command(forecast)
 main.add_command(hook)
 main.add_command(rates)
 main.add_command(strategy)
+main.add_command(summary)
 
 
 @main.command(context_settings={"ignore_unknown_options": True})
