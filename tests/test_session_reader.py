@@ -323,3 +323,39 @@ class TestFindSessionJsonl:
             claude_dir=tmp_path,
         )
         assert result is None
+
+
+# ── CLI cost command tests ──────────────────────────────────────────
+
+
+class TestCostCLI:
+    """Test the agentmeter cost CLI command."""
+
+    def test_cost_no_sessions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from click.testing import CliRunner
+
+        from agentmeter.cli import main
+
+        monkeypatch.setenv("AGENTMETER_DB", str(tmp_path / "empty.db"))
+        runner = CliRunner()
+        result = runner.invoke(main, ["cost"])
+        assert result.exit_code == 0
+        assert (
+            "No sessions" in result.output
+            or "No session transcripts" in result.output
+        )
+
+    def test_cost_missing_session_id(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from click.testing import CliRunner
+
+        from agentmeter.cli import main
+
+        monkeypatch.setenv("AGENTMETER_DB", str(tmp_path / "test.db"))
+        runner = CliRunner()
+        result = runner.invoke(main, ["cost", "nonexistent-session"])
+        assert result.exit_code == 0
+        assert "not found" in result.output

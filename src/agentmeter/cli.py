@@ -8,6 +8,7 @@ import click
 
 from agentmeter.cli_breaker import breaker
 from agentmeter.cli_budget import budget
+from agentmeter.cli_cost import cost
 from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
 from agentmeter.cli_hook import hook
 from agentmeter.db import MeterDB
@@ -21,6 +22,7 @@ def main() -> None:
 
 main.add_command(budget)
 main.add_command(breaker)
+main.add_command(cost)
 main.add_command(hook)
 
 
