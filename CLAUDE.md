@@ -2,9 +2,12 @@
 
 ## What This Is
 
-AgentMeter is an open-source MCP proxy that meters every tool call between an
-AI agent (Claude Code, Cursor, etc.) and any MCP server. It's the missing
-economics layer for MCP agents.
+AgentMeter is the universal metering layer for AI coding agents. It captures
+every tool call — whether through an MCP proxy or agent hook system — and
+provides cost attribution, spend forecasting, and budget enforcement.
+
+It works with Claude Code, Gemini CLI, Codex CLI, Copilot CLI, and any
+MCP-compatible agent.
 
 **Tagline:** "Know what your agents cost."
 
@@ -19,16 +22,23 @@ strategy context.
 
 ## Architecture
 
+Two capture paths feed the same database:
+
 ```
-Agent (Claude Code) → AgentMeter (proxy) → MCP Server (any)
-                          ↓
-                     SQLite DB
-                     (~/.local/share/agentmeter/agentmeter.db)
+Path 1: Hook (primary — every Claude Code / Gemini / Codex / Copilot user)
+  Agent's built-in tools → PostToolUse hook → agentmeter.hooks.<agent> → SQLite DB
+
+Path 2: MCP Proxy (power users running MCP servers)
+  Agent → AgentMeter proxy → MCP Server (child subprocess) → SQLite DB
+
+Both paths → same DB (~/.local/share/agentmeter/agentmeter.db)
+           → same CLI commands (stats, sessions, daily, advise, forecast)
+           → same rate card for cost estimation
 ```
 
-The proxy is transparent — the agent doesn't know it's there, the MCP server
-doesn't know it's there. AgentMeter spawns the child MCP server as a subprocess
-and proxies all MCP traffic via stdio.
+The hook path is the primary product — it captures built-in tool calls (Read,
+Edit, Bash, etc.) for any agent with a hook system. The MCP proxy is the
+advanced path for metering MCP server traffic.
 
 ## Tech Stack
 
@@ -43,22 +53,39 @@ and proxies all MCP traffic via stdio.
 
 ```
 src/agentmeter/
-├── __init__.py       # Version
-├── __main__.py       # python -m agentmeter entry point
-├── proxy.py          # MCP proxy core — the main product
-├── db.py             # SQLite storage for metering data
-├── models.py         # Dataclasses: ToolCall, Session, Budget, BreakerConfig, etc.
-└── cli.py            # CLI: wrap, stats, sessions, calls, daily, rename
+├── __init__.py          # Version
+├── __main__.py          # python -m agentmeter entry point
+├── proxy.py             # MCP proxy core (Path 2)
+├── models.py            # Dataclasses: ToolCall, Session, NormalisedToolEvent, etc.
+├── cli.py               # CLI: wrap, stats, sessions, calls, daily, rename, rates
+├── hook.py              # Legacy entry point (imports from hooks/claude.py)
+├── hooks/               # Multi-agent hook system (Path 1)
+│   ├── __init__.py      # Re-exports, backwards compat
+│   ├── base.py          # NormalisedToolEvent → DB recording logic
+│   ├── claude.py        # Claude Code PostToolUse adapter
+│   ├── gemini.py        # Gemini CLI AfterTool adapter
+│   ├── codex.py         # Codex CLI PostToolUse adapter
+│   └── copilot.py       # Copilot CLI postToolUse adapter
+└── db/                  # Database layer (split by domain)
+    ├── __init__.py      # MeterDB class, re-exports
+    ├── schema.py        # Schema DDL, migrations, connection setup
+    ├── sessions.py      # Session CRUD + auto-naming
+    ├── calls.py         # Tool call recording + queries
+    ├── budget.py        # Budget CRUD + checking
+    ├── breaker.py       # Circuit breaker CRUD + trips
+    ├── rates.py         # Rate card CRUD
+    └── analytics.py     # Distribution, aggregates, cost estimation
 tests/
-├── conftest.py       # Shared fixtures (tmp_db, test_server_path)
-├── test_db.py        # DB unit tests (positive)
-├── test_security.py  # SQL injection, file system safety, data truncation
-├── test_boundaries.py # String, numeric, limit, time edge cases
-├── test_cli.py       # CLI command tests via CliRunner
-├── test_integration.py # End-to-end proxy tests (pytest)
-├── test_proxy.py     # Standalone integration test (manual)
-├── test_server.py    # Minimal MCP server for testing
-└── TEST_STRATEGY.md  # Test strategy with deferred test triggers
+├── conftest.py          # Shared fixtures (tmp_db, test_server_path)
+├── test_db.py           # DB unit tests (positive)
+├── test_security.py     # SQL injection, file system safety, data truncation
+├── test_boundaries.py   # String, numeric, limit, time edge cases
+├── test_cli.py          # CLI command tests via CliRunner
+├── test_hooks.py        # Hook adapter tests (all agents)
+├── test_integration.py  # End-to-end proxy tests (pytest)
+├── test_proxy.py        # Standalone integration test (manual)
+├── test_server.py       # Minimal MCP server for testing
+└── TEST_STRATEGY.md     # Test strategy with deferred test triggers
 ```
 
 ## Running
@@ -135,10 +162,53 @@ ending a session mid-task, write `.handoff.md` following the protocol in
 `/media/aa/LargeBackup/MainApps/_playbook/session-handoff-protocol.md`.
 Delete it when the task is complete.
 
-## Constraints
+## Codebase Principles
 
+### Hard constraints
 - ruff must pass with zero errors before any commit
 - All data structures are dataclasses — no dicts-as-data
 - Proxy must be fully transparent — no modification of tool call data
 - Local-first: no cloud services, no accounts, no signup
-- All SQL queries must use parameterized `?` placeholders — no f-string interpolation
+- All SQL queries must use parameterised `?` placeholders — no f-string interpolation
+
+### Data integrity
+- Metering data is the product. Never silently drop data — log to stderr on failure.
+- Every write path must handle crashes gracefully (WAL mode, atomic commits).
+- Store facts at write time, derive economics at query time. Never store computed
+  costs — they go stale when rates change.
+
+### Module discipline
+- Each `.py` file has one clear responsibility. Soft ceiling ~200-300 lines,
+  hard ceiling 500. Split by domain boundary, not arbitrary line count.
+- Layers: Hooks (capture) → DB (storage) → Queries (analysis) → CLI (display).
+  Each layer has one job. Don't cross boundaries.
+
+### Hook path rules
+- Hooks are a hot path (<5ms). Minimal imports, no network calls, no file reads
+  beyond the DB. stdlib + agentmeter.db only.
+- If a hook fails, exit cleanly. The agent's work is more important than metering.
+- No stdout pollution — agents parse stdout. Diagnostics go to stderr only.
+
+### Backwards compatibility
+- `python3 -m agentmeter.hook` must keep working forever (installed in users'
+  settings.json). New entry points are additive.
+- DB schema changes are additive only — new columns with defaults or nullable.
+  Old queries keep working. Old data stays valid.
+- CLI commands are stable — `agentmeter stats` today must still work after changes.
+
+### Multi-agent design
+- Agent adapters are thin (~40 lines) — just field mapping to NormalisedToolEvent.
+- All shared logic lives in hooks/base.py. No duplication across adapters.
+- The DB schema and rate card are agent-agnostic. The `agent` column distinguishes
+  data sources, but all queries work across agents by default.
+
+### Testing
+- Test the contract, not the implementation. Hook writes correct row? Pass.
+  Query returns correct numbers? Pass.
+- Integration tests > unit tests for a tool this size.
+- Run `python3 -m pytest tests/ -v` after every change. Don't break existing tests.
+
+### Avoid
+- No premature abstraction — shared functions before base classes.
+- No speculative features — build what's needed now, not what might be needed.
+- No config wizards — zero-config by default, configurable when needed.

@@ -215,8 +215,8 @@ class TestDailyTotals:
 
         totals = tmp_db.get_daily_totals(days=1)
         assert len(totals) == 1
-        assert totals[0]["call_count"] == 2
-        assert totals[0]["error_count"] == 1
+        assert totals[0].call_count == 2
+        assert totals[0].error_count == 1
 
 
 class TestSessionDistribution:

@@ -6,14 +6,22 @@ from datetime import datetime, timedelta
 
 import click
 
+from agentmeter.cli_breaker import breaker
+from agentmeter.cli_budget import budget
+from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
+from agentmeter.cli_hook import hook
 from agentmeter.db import MeterDB
-from agentmeter.models import BreakerConfig, Budget
 
 
 @click.group()
 @click.version_option(package_name="agentmeter")
 def main() -> None:
     """AgentMeter — meter every MCP tool call."""
+
+
+main.add_command(budget)
+main.add_command(breaker)
+main.add_command(hook)
 
 
 @main.command(context_settings={"ignore_unknown_options": True})
@@ -46,7 +54,7 @@ def stats(period: str | None, server: str | None, distribution: bool) -> None:
     db = MeterDB()
 
     if distribution:
-        _print_distribution(db, server)
+        print_distribution(db, server)
         db.close()
         return
 
@@ -78,12 +86,11 @@ def stats(period: str | None, server: str | None, distribution: bool) -> None:
     click.echo(
         f"  Total: {total_calls} calls | "
         f"{total_errors} errors | "
-        f"{_format_ms(total_time_ms)} tool time"
+        f"{format_ms(total_time_ms)} tool time"
     )
     click.echo()
 
-    # Tool breakdown
-    _print_tool_table(tool_stats, total_calls)
+    print_tool_table(tool_stats, total_calls)
     click.echo()
 
     db.close()
@@ -108,14 +115,14 @@ def sessions(limit: int) -> None:
         click.echo(f"  {'─' * 50}")
 
         if ss.tools:
-            _print_tool_table(ss.tools, ss.total_calls)
+            print_tool_table(ss.tools, ss.total_calls)
         else:
             click.echo("  No tool calls in this session.")
 
         click.echo(
             f"  Total: {ss.total_calls} calls | "
             f"{ss.total_errors} errors | "
-            f"{_format_ms(ss.total_elapsed_ms)}"
+            f"{format_ms(ss.total_elapsed_ms)}"
         )
 
     click.echo()
@@ -138,15 +145,15 @@ def daily(days: int) -> None:
     click.echo(f"  Daily Totals (last {days} days)")
     click.echo(f"  {'─' * 50}")
 
-    max_calls = max(t["call_count"] for t in totals) if totals else 1
+    max_calls = max(t.call_count for t in totals) if totals else 1
 
     for t in totals:
-        bar_len = int((t["call_count"] / max_calls) * 30) if max_calls > 0 else 0
+        bar_len = int((t.call_count / max_calls) * 30) if max_calls > 0 else 0
         bar = "█" * bar_len
-        err_str = f" ({t['error_count']} err)" if t["error_count"] else ""
+        err_str = f" ({t.error_count} err)" if t.error_count else ""
         click.echo(
-            f"  {t['day']}  {bar}  {t['call_count']} calls{err_str}  "
-            f"{_format_ms(t['total_elapsed_ms'])}"
+            f"  {t.day}  {bar}  {t.call_count} calls{err_str}  "
+            f"{format_ms(t.total_elapsed_ms)}"
         )
 
     click.echo()
@@ -176,6 +183,7 @@ def rename(session_id: str, name: str) -> None:
 def calls(limit: int, tool: str | None) -> None:
     """Show recent individual tool calls."""
     db = MeterDB()
+    from agentmeter.cli_format import format_bytes
     recent = db.get_recent_calls(limit=limit, tool_name=tool)
 
     if not recent:
@@ -192,325 +200,10 @@ def calls(limit: int, tool: str | None) -> None:
         time_str = c.started_at[11:19] if len(c.started_at) > 19 else c.started_at
         click.echo(
             f"  {time_str}  {status}  {c.tool_name:<30}  "
-            f"{c.elapsed_ms:>6}ms  {_format_bytes(c.result_size):>8}"
+            f"{c.elapsed_ms:>6}ms  {format_bytes(c.result_size):>8}"
         )
 
     click.echo()
-    db.close()
-
-
-@main.group()
-def budget() -> None:
-    """Manage budget rules for tool call limits."""
-
-
-@budget.command("set")
-@click.argument("scope", type=click.Choice(["session", "daily"]))
-@click.argument("max_calls", type=int)
-@click.option(
-    "--server", "-s", default="",
-    help="Limit to a specific server (default: all).",
-)
-@click.option(
-    "--action", "-a",
-    type=click.Choice(["deny", "warn"]),
-    default="deny",
-    help="Action when limit is reached: deny (block) or warn (log only).",
-)
-def budget_set(scope: str, max_calls: int, server: str, action: str) -> None:
-    """Set a budget rule.
-
-    Examples:
-        agentmeter budget set session 50
-        agentmeter budget set daily 200 --server mailsift
-        agentmeter budget set session 100 --action warn
-    """
-    db = MeterDB()
-    b = Budget(scope=scope, server_name=server, max_calls=max_calls, action=action)
-    db.set_budget(b)
-
-    target = server or "all servers"
-    click.echo(
-        f"  Budget set: {scope} limit of {max_calls} calls "
-        f"for {target} ({action})"
-    )
-    db.close()
-
-
-@budget.command("show")
-def budget_show() -> None:
-    """Show all budget rules."""
-    db = MeterDB()
-    budgets = db.get_budgets()
-
-    if not budgets:
-        click.echo("\n  No budget rules configured.\n")
-        db.close()
-        return
-
-    click.echo()
-    click.echo("  Budget Rules")
-    click.echo(f"  {'─' * 60}")
-
-    for b in budgets:
-        target = b.server_name or "all servers"
-        click.echo(
-            f"  [{b.action.upper():>4}]  {b.scope:<8}  "
-            f"{b.max_calls:>6} calls  {target}"
-        )
-
-    click.echo()
-    db.close()
-
-
-@budget.command("clear")
-@click.option("--scope", "-s", type=click.Choice(["session", "daily"]), default=None)
-@click.option("--server", default=None, help="Clear rules for a specific server.")
-@click.confirmation_option(prompt="Remove budget rules?")
-def budget_clear(scope: str | None, server: str | None) -> None:
-    """Remove budget rules.
-
-    Examples:
-        agentmeter budget clear            # clear all
-        agentmeter budget clear -s daily   # clear daily rules only
-    """
-    db = MeterDB()
-    removed = db.clear_budget(scope=scope, server_name=server)
-    click.echo(f"  Removed {removed} budget rule(s).")
-    db.close()
-
-
-@main.group()
-def breaker() -> None:
-    """Manage circuit breakers for velocity-based call gating."""
-
-
-@breaker.command("set")
-@click.argument("max_calls", type=int)
-@click.argument("window", type=int)
-@click.option(
-    "--cooldown", "-c", default=300,
-    help="Seconds to block after trip (default: 300).",
-)
-@click.option(
-    "--server", "-s", default="",
-    help="Limit to a specific server (default: all).",
-)
-def breaker_set(
-    max_calls: int, window: int, cooldown: int, server: str,
-) -> None:
-    """Set a circuit breaker.
-
-    Trips when MAX_CALLS occur within WINDOW seconds.
-    Once tripped, blocks all calls for --cooldown seconds.
-
-    Examples:
-        agentmeter breaker set 20 60
-        agentmeter breaker set 10 30 --cooldown 600
-        agentmeter breaker set 50 120 --server mailsift
-    """
-    db = MeterDB()
-    config = BreakerConfig(
-        server_name=server,
-        max_calls=max_calls,
-        window_seconds=window,
-        cooldown_seconds=cooldown,
-    )
-    db.set_breaker(config)
-
-    target = server or "all servers"
-    click.echo(
-        f"  Breaker set: {max_calls} calls/{window}s "
-        f"for {target} (cooldown: {cooldown}s)"
-    )
-    db.close()
-
-
-@breaker.command("show")
-def breaker_show() -> None:
-    """Show circuit breaker configs and recent trips."""
-    db = MeterDB()
-    configs = db.get_breakers()
-
-    if not configs:
-        click.echo("\n  No circuit breakers configured.\n")
-        db.close()
-        return
-
-    click.echo()
-    click.echo("  Circuit Breakers")
-    click.echo(f"  {'─' * 60}")
-
-    for c in configs:
-        target = c.server_name or "all servers"
-        click.echo(
-            f"  {c.max_calls} calls/{c.window_seconds}s  "
-            f"cooldown: {c.cooldown_seconds}s  {target}"
-        )
-
-    trips = db.get_breaker_trips(limit=5)
-    if trips:
-        click.echo()
-        click.echo("  Recent Trips")
-        click.echo(f"  {'─' * 60}")
-        for t in trips:
-            click.echo(
-                f"  {t['tripped_at'][:19]}  "
-                f"{t['server_name']}  "
-                f"{t['call_count']} calls/"
-                f"{t['window_seconds']}s"
-            )
-
-    click.echo()
-    db.close()
-
-
-@breaker.command("clear")
-@click.option(
-    "--server", default=None,
-    help="Clear breaker for a specific server.",
-)
-@click.confirmation_option(prompt="Remove circuit breakers?")
-def breaker_clear(server: str | None) -> None:
-    """Remove circuit breaker configs."""
-    db = MeterDB()
-    removed = db.clear_breakers(server_name=server)
-    click.echo(f"  Removed {removed} circuit breaker(s).")
-    db.close()
-
-
-# ── Helpers ─────────────────────────────────────────────────────────
-
-
-def _print_distribution(db: MeterDB, server: str | None) -> None:
-    """Print per-server session distribution (p50/p90/p99)."""
-    dists = db.get_session_distribution(server_name=server)
-
-    if not dists:
-        click.echo("\n  No sessions recorded.\n")
-        return
-
-    click.echo()
-    click.echo("  Session Distribution (all time)")
-    click.echo(f"  {'─' * 70}")
-
-    for d in dists:
-        label = d.server_name or "(unnamed)"
-        click.echo(f"\n  {label}  ({d.session_count} sessions)")
-        click.echo(f"  {'─' * 50}")
-        click.echo(
-            f"  {'':>18}  {'p50':>10}  {'p90':>10}  {'p99':>10}"
-        )
-        click.echo(
-            f"  {'calls':>18}  {d.p50_calls:>10}  "
-            f"{d.p90_calls:>10}  {d.p99_calls:>10}"
-        )
-        click.echo(
-            f"  {'tool time':>18}  {_format_ms(d.p50_elapsed_ms):>10}  "
-            f"{_format_ms(d.p90_elapsed_ms):>10}  {_format_ms(d.p99_elapsed_ms):>10}"
-        )
-        rb = (d.p50_result_bytes, d.p90_result_bytes, d.p99_result_bytes)
-        click.echo(
-            f"  {'result size':>18}  {_format_bytes(rb[0]):>10}  "
-            f"{_format_bytes(rb[1]):>10}  {_format_bytes(rb[2]):>10}"
-        )
-
-    click.echo()
-
-
-def _print_tool_table(tools: list, total_calls: int) -> None:
-    """Print a formatted tool stats table with bar chart."""
-    max_count = max(t.call_count for t in tools) if tools else 1
-
-    for t in tools:
-        bar_len = int((t.call_count / max_count) * 20) if max_count > 0 else 0
-        bar = "█" * bar_len
-        err_str = f" ({t.error_count} err)" if t.error_count else ""
-        avg_str = f"{t.avg_elapsed_ms:.0f}ms avg" if t.avg_elapsed_ms else ""
-
-        click.echo(
-            f"  {t.tool_name:<30}  {bar}  "
-            f"{t.call_count:>4} calls{err_str}  {avg_str}"
-        )
-
-
-def _format_ms(ms: int) -> str:
-    """Format milliseconds into human-readable duration."""
-    if ms < 1000:
-        return f"{ms}ms"
-    seconds = ms / 1000
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    minutes = seconds / 60
-    if minutes < 60:
-        return f"{minutes:.1f}m"
-    hours = minutes / 60
-    return f"{hours:.1f}h"
-
-
-def _format_bytes(size: int) -> str:
-    """Format byte count into human-readable size."""
-    if size < 1024:
-        return f"{size}B"
-    if size < 1024 * 1024:
-        return f"{size / 1024:.1f}KB"
-    return f"{size / (1024 * 1024):.1f}MB"
-
-
-@main.group()
-def hook() -> None:
-    """Manage the PostToolUse hook for Claude Code built-in tools."""
-
-
-@hook.command("install")
-def hook_install() -> None:
-    """Print the hook configuration to add to Claude Code settings.
-
-    Paste the output into ~/.claude/settings.json under the "hooks" key.
-    """
-    import json as _json
-    import shutil
-
-    python_path = shutil.which("python3") or "python3"
-
-    config = {
-        "hooks": {
-            "PostToolUse": [
-                {
-                    "matcher": "*",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": f"{python_path} -m agentmeter.hook",
-                            "timeout": 2000,
-                        },
-                    ],
-                },
-            ],
-        },
-    }
-
-    click.echo("Add this to ~/.claude/settings.json:\n")
-    click.echo(_json.dumps(config, indent=2))
-    click.echo(
-        "\nOr merge the PostToolUse array into your existing hooks config."
-    )
-
-
-@hook.command("status")
-def hook_status() -> None:
-    """Show hook metering stats (claude-code sessions)."""
-    db = MeterDB()
-    stats = db.get_tool_stats(server_name="claude-code")
-    if not stats:
-        click.echo("No hook data yet. Is the PostToolUse hook installed?")
-        db.close()
-        return
-
-    total = sum(s.call_count for s in stats)
-    click.echo(f"Hook metering: {total} tool calls across {len(stats)} tools\n")
-    for s in sorted(stats, key=lambda x: x.call_count, reverse=True):
-        click.echo(f"  {s.tool_name:<20} {s.call_count:>5} calls")
     db.close()
 
 

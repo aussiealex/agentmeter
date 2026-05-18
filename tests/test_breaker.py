@@ -131,15 +131,15 @@ class TestBreakerTrips:
 
         trips = db.get_breaker_trips()
         assert len(trips) == 1
-        assert trips[0]["server_name"] == "testserver"
-        assert trips[0]["call_count"] == 25
+        assert trips[0].server_name == "testserver"
+        assert trips[0].call_count == 25
 
     def test_trips_ordered_newest_first(self, db: MeterDB) -> None:
         db.record_breaker_trip("s1", 10, 30)
         db.record_breaker_trip("s2", 20, 60)
 
         trips = db.get_breaker_trips()
-        assert trips[0]["server_name"] == "s2"
+        assert trips[0].server_name == "s2"
 
     def test_trips_limited(self, db: MeterDB) -> None:
         for i in range(20):
@@ -319,7 +319,7 @@ class TestBreakerProxy:
 
         trips = db.get_breaker_trips()
         assert len(trips) == 1
-        assert trips[0]["call_count"] == 4
+        assert trips[0].call_count == 4
 
         db.close()
 

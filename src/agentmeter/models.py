@@ -80,6 +80,28 @@ class ServerDistribution:
 
 
 @dataclass
+class DailyTotal:
+    """Aggregated tool call stats for a single day."""
+
+    day: str = ""
+    call_count: int = 0
+    error_count: int = 0
+    total_elapsed_ms: int = 0
+
+
+@dataclass
+class BreakerTrip:
+    """A recorded circuit breaker trip event."""
+
+    id: int | None = None
+    server_name: str = ""
+    call_count: int = 0
+    window_seconds: int = 0
+    tripped_at: str = ""
+    resolved_at: str | None = None
+
+
+@dataclass
 class Budget:
     """A budget rule that limits tool call volume.
 
