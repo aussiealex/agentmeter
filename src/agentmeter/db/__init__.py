@@ -13,13 +13,14 @@ import os
 import sqlite3
 from pathlib import Path
 
-from agentmeter.db import analytics, breaker, budget, calls, sessions
+from agentmeter.db import analytics, breaker, budget, calls, rates, sessions
 from agentmeter.db.schema import init_schema
 from agentmeter.models import (
     BreakerConfig,
     BreakerTrip,
     Budget,
     DailyTotal,
+    RateCard,
     ServerDistribution,
     Session,
     SessionStats,
@@ -165,3 +166,17 @@ class MeterDB:
         server_name: str | None = None,
     ) -> list[ServerDistribution]:
         return analytics.get_session_distribution(self._conn, server_name)
+
+    # ── Rate card operations ─────────────────────────────────────────
+
+    def get_rate(self, model_id: str) -> RateCard | None:
+        return rates.get_rate(self._conn, model_id)
+
+    def get_all_rates(self) -> list[RateCard]:
+        return rates.get_all_rates(self._conn)
+
+    def set_rate(self, rate: RateCard) -> None:
+        rates.set_rate(self._conn, rate)
+
+    def clear_rates(self) -> int:
+        return rates.clear_rates(self._conn)

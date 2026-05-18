@@ -60,6 +60,17 @@ CREATE TABLE IF NOT EXISTS budget (
     action          TEXT NOT NULL DEFAULT 'deny',
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS rate_card (
+    model_id           TEXT PRIMARY KEY,
+    display_name       TEXT NOT NULL DEFAULT '',
+    input_per_mtok     REAL NOT NULL,
+    output_per_mtok    REAL NOT NULL,
+    cached_per_mtok    REAL NOT NULL DEFAULT 0,
+    chars_per_token    REAL NOT NULL DEFAULT 4.0,
+    calibration_factor REAL NOT NULL DEFAULT 1.0,
+    updated_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -74,11 +85,58 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add columns that may be missing from older databases."""
-    columns = {
+    session_cols = {
         r[1]
         for r in conn.execute("PRAGMA table_info(session)").fetchall()
     }
-    if "name" not in columns:
+    if "name" not in session_cols:
         conn.execute(
             "ALTER TABLE session ADD COLUMN name TEXT NOT NULL DEFAULT ''"
+        )
+
+    # Multi-agent foundation columns (added 2026-05-18)
+    tc_cols = {
+        r[1]
+        for r in conn.execute("PRAGMA table_info(tool_call)").fetchall()
+    }
+    for col, ddl in _TOOL_CALL_MIGRATIONS:
+        if col not in tc_cols:
+            conn.execute(f"ALTER TABLE tool_call ADD COLUMN {ddl}")
+
+    # Seed default rate card if empty
+    count = conn.execute("SELECT COUNT(*) FROM rate_card").fetchone()[0]
+    if count == 0:
+        _seed_default_rates(conn)
+
+
+_TOOL_CALL_MIGRATIONS = [
+    ("agent", "agent TEXT NOT NULL DEFAULT ''"),
+    ("project", "project TEXT NOT NULL DEFAULT ''"),
+    ("model_id", "model_id TEXT NOT NULL DEFAULT ''"),
+    ("input_size", "input_size INTEGER NOT NULL DEFAULT 0"),
+]
+
+
+def _seed_default_rates(conn: sqlite3.Connection) -> None:
+    """Insert default rate card entries for known models."""
+    defaults = [
+        # Anthropic
+        ("claude-opus-4-6", "Claude Opus 4.6", 15.0, 75.0, 1.5),
+        ("claude-sonnet-4-6", "Claude Sonnet 4.6", 3.0, 15.0, 0.3),
+        ("claude-haiku-4-5", "Claude Haiku 4.5", 0.8, 4.0, 0.08),
+        # Google
+        ("gemini-2.5-pro", "Gemini 2.5 Pro", 1.25, 10.0, 0.315),
+        ("gemini-2.5-flash", "Gemini 2.5 Flash", 0.15, 0.6, 0.0375),
+        # OpenAI
+        ("gpt-4.1", "GPT-4.1", 2.0, 8.0, 0.5),
+        ("gpt-4.1-mini", "GPT-4.1 Mini", 0.4, 1.6, 0.1),
+        ("o3", "o3", 2.0, 8.0, 0.5),
+        ("o4-mini", "o4-mini", 1.1, 4.4, 0.275),
+    ]
+    for model_id, name, inp, out, cached in defaults:
+        conn.execute(
+            "INSERT OR IGNORE INTO rate_card "
+            "(model_id, display_name, input_per_mtok, output_per_mtok, "
+            "cached_per_mtok) VALUES (?, ?, ?, ?, ?)",
+            (model_id, name, inp, out, cached),
         )

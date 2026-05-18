@@ -102,6 +102,45 @@ class BreakerTrip:
 
 
 @dataclass
+class NormalisedToolEvent:
+    """Agent-agnostic tool call event produced by hook adapters.
+
+    This is the common format that all hook adapters (Claude, Gemini,
+    Codex, Copilot) normalise their agent-specific payloads into.
+    """
+
+    session_id: str = ""
+    agent: str = ""              # "claude-code", "gemini-cli", etc.
+    tool_name: str = ""
+    input_size: int = 0          # bytes, before truncation
+    result_size: int = 0         # bytes
+    result_type: str = "success"  # "success", "error", "denied"
+    model_id: str = ""           # when available, else ""
+    project: str = ""            # extracted from cwd
+    cwd: str = ""
+    timestamp: str = ""
+    elapsed_ms: int = 0          # 0 when not available
+    arguments_json: str = ""     # truncated to 1000 chars
+    result_json: str = ""        # truncated to 2000 chars
+
+
+@dataclass
+class RateCard:
+    """Pricing rates for a model, used for cost estimation at query time."""
+
+    model_id: str = ""
+    display_name: str = ""
+    input_per_mtok: float = 0.0   # $ per million input tokens
+    output_per_mtok: float = 0.0  # $ per million output tokens
+    cached_per_mtok: float = 0.0  # $ per million cached tokens
+    chars_per_token: float = 4.0  # estimation ratio
+    calibration_factor: float = 1.0  # multiplier from agentmeter calibrate
+    updated_at: str = field(
+        default_factory=lambda: datetime.now().isoformat(),
+    )
+
+
+@dataclass
 class Budget:
     """A budget rule that limits tool call volume.
 
