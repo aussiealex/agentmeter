@@ -37,6 +37,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._api_daily()
         elif self.path == "/api/sessions" or self.path.startswith("/api/sessions?"):
             self._api_sessions()
+        elif self.path == "/api/overview":
+            self._api_overview()
         else:
             super().do_GET()
 
@@ -51,6 +53,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_sessions(self):
         """Return session list with cost as JSON."""
         self._json_response(build_sessions_data(self.db))
+
+    def _api_overview(self):
+        """Return overview KPIs as JSON."""
+        self._json_response(build_overview_data(self.db))
 
     def _api_rates(self):
         """Return rate card as JSON."""
@@ -254,6 +260,65 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
             "start": (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d"),
             "end": datetime.now().strftime("%Y-%m-%d"),
         },
+    }
+
+
+def build_overview_data(db: MeterDB) -> dict:
+    """Build overview KPIs from project and session data."""
+    proj_data = build_projects_data(db)
+    ps = proj_data["projects"]
+
+    total_cost = proj_data["totalCost"]
+    total_sessions = proj_data["totalSessions"]
+    total_commits = sum(p["outcomes"]["commits"] for p in ps)
+    total_tests = sum(p["outcomes"]["testsPassed"] for p in ps)
+    cost_per_commit = (
+        round(total_cost / total_commits, 2)
+        if total_commits > 0 else 0
+    )
+
+    # Top project
+    top_proj = ps[0]["name"] if ps else "—"
+    top_pct = ps[0]["sharePct"] if ps else 0
+
+    # Daily average
+    daily_data = build_daily_data(db)
+    days_with_cost = [
+        d for d in daily_data["days"] if d["cost"] > 0
+    ]
+    daily_avg = (
+        round(total_cost / len(days_with_cost), 2)
+        if days_with_cost else 0
+    )
+
+    # Projected EOM
+    now = datetime.now()
+    day_of_month = now.day
+    days_in_month = 31  # rough
+    projected = round(
+        total_cost / day_of_month * days_in_month, 2,
+    ) if day_of_month > 0 else 0
+
+    return {
+        "totalCost": total_cost,
+        "totalSessions": total_sessions,
+        "totalCommits": total_commits,
+        "totalTests": total_tests,
+        "costPerCommit": cost_per_commit,
+        "dailyAvg": daily_avg,
+        "projected": projected,
+        "topProject": top_proj,
+        "topProjectPct": top_pct,
+        "projectCount": len(ps),
+        "projects": [
+            {
+                "name": p["name"],
+                "cost": p["cost"],
+                "sharePct": p["sharePct"],
+                "sessions": p["sessions"],
+            }
+            for p in ps
+        ],
     }
 
 

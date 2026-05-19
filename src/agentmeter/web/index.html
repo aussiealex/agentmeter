@@ -464,6 +464,53 @@
   .muted { color: var(--fg-mute); }
   .dim   { color: var(--fg-dim); }
   .loading { padding: 40px 28px; color: var(--fg-mute); }
+
+  /* KPI cards */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    margin: 0 28px 0;
+    border: 1px solid var(--rule);
+  }
+  .kpi {
+    background: var(--bg);
+    padding: 20px 22px;
+  }
+  .kpi .kpi-v {
+    font-size: 26px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+  .kpi .kpi-v.amber { color: var(--amber); }
+  .kpi .kpi-v.green { color: var(--green); }
+  .kpi .kpi-l {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+    margin-top: 6px;
+  }
+  .kpi .kpi-sub {
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-top: 4px;
+  }
+
+  /* overview project list */
+  .ov-project {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 100px;
+    gap: 20px;
+    padding: 12px 28px;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rule-3);
+    font-size: 14px;
+  }
+  .ov-project.stripe { background: var(--bg-stripe); }
 </style>
 </head>
 <body>
@@ -708,6 +755,55 @@ function renderRates(rates) {
   main.innerHTML = parts.join('');
 }
 
+// ─── Overview view ───
+function renderOverview(data) {
+  var main = document.getElementById('content');
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>overview</b></div>',
+    '<div class="right"><div class="field"><span class="k">period</span><span class="v">month to date</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Overview</div></div>',
+    '<div class="kpi-row">',
+    '<div class="kpi"><div class="kpi-v amber">$', fmt(data.totalCost), '</div>',
+    '<div class="kpi-l">total spend</div>',
+    '<div class="kpi-sub">projected $', fmt(data.projected), ' eom</div></div>',
+    '<div class="kpi"><div class="kpi-v">', data.totalSessions, '</div>',
+    '<div class="kpi-l">sessions</div>',
+    '<div class="kpi-sub">', data.projectCount, ' projects</div></div>',
+    '<div class="kpi"><div class="kpi-v green">', data.totalCommits, '</div>',
+    '<div class="kpi-l">commits</div>',
+    '<div class="kpi-sub">', fmtI(data.totalTests), ' tests passed</div></div>',
+    '<div class="kpi"><div class="kpi-v amber">$', fmt(data.costPerCommit), '</div>',
+    '<div class="kpi-l">cost · commit</div></div>',
+    '<div class="kpi"><div class="kpi-v">$', fmt(data.dailyAvg), '</div>',
+    '<div class="kpi-l">daily avg</div></div>',
+    '</div>'
+  );
+
+  // Project summary list
+  parts.push(
+    '<div style="padding:26px 28px 12px"><div class="exp-h">projects by cost</div></div>'
+  );
+  data.projects.forEach(function(p, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="ov-project', stripe, '">',
+      '<span><span style="color:var(--fg);font-weight:500">', esc(p.name), '</span></span>',
+      '<span class="num">', p.sharePct, '%</span>',
+      '<span class="num">', p.sessions, ' sessions</span>',
+      '<span class="cost" style="text-align:right;color:var(--amber);font-weight:500">$', fmt(p.cost), '</span>',
+      '</div>'
+    );
+  });
+
+  main.innerHTML = parts.join('');
+
+  // Update badges
+  var bp = document.getElementById('badge-projects');
+  if (bp) bp.textContent = data.projectCount;
+}
+
 // ─── Sessions view ───
 function renderSessions(data) {
   var main = document.getElementById('content');
@@ -807,7 +903,10 @@ function switchView(view) {
   var main = document.getElementById('content');
   main.innerHTML = '<div class="loading">Loading...</div>';
 
-  if (view === 'projects') {
+  if (view === 'overview') {
+    fetch('/api/overview').then(function(r) { return r.json(); }).then(renderOverview)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'projects') {
     fetch('/api/projects').then(function(r) { return r.json(); }).then(renderProjects)
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'rates') {
