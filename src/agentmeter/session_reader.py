@@ -95,8 +95,10 @@ def calculate_session_cost(
 ) -> SessionCost:
     """Calculate cost breakdown from real tokens and a rate card."""
     input_cost = tokens.input_tokens * rate.input_per_mtok / 1_000_000
+    # Use cache write rate (1.25x for Anthropic, 1.0x for others)
+    write_rate = rate.cache_write_per_mtok or rate.input_per_mtok
     cache_create_cost = (
-        tokens.cache_creation_tokens * rate.input_per_mtok / 1_000_000
+        tokens.cache_creation_tokens * write_rate / 1_000_000
     )
     cache_read_cost = (
         tokens.cache_read_tokens * rate.cached_per_mtok / 1_000_000

@@ -34,14 +34,16 @@ def set_rate(conn: sqlite3.Connection, rate: RateCard) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO rate_card "
         "(model_id, display_name, input_per_mtok, output_per_mtok, "
-        "cached_per_mtok, chars_per_token, calibration_factor, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "cached_per_mtok, cache_write_per_mtok, chars_per_token, "
+        "calibration_factor, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             rate.model_id,
             rate.display_name,
             rate.input_per_mtok,
             rate.output_per_mtok,
             rate.cached_per_mtok,
+            rate.cache_write_per_mtok,
             rate.chars_per_token,
             rate.calibration_factor,
             datetime.now().isoformat(),
@@ -58,12 +60,18 @@ def clear_rates(conn: sqlite3.Connection) -> int:
 
 
 def _row_to_rate(row: sqlite3.Row) -> RateCard:
+    # cache_write_per_mtok may not exist in older DBs before migration runs
+    try:
+        cache_write = row["cache_write_per_mtok"]
+    except (IndexError, KeyError):
+        cache_write = 0.0
     return RateCard(
         model_id=row["model_id"],
         display_name=row["display_name"],
         input_per_mtok=row["input_per_mtok"],
         output_per_mtok=row["output_per_mtok"],
         cached_per_mtok=row["cached_per_mtok"],
+        cache_write_per_mtok=cache_write,
         chars_per_token=row["chars_per_token"],
         calibration_factor=row["calibration_factor"],
         updated_at=row["updated_at"],

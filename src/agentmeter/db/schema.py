@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS rate_card (
     input_per_mtok     REAL NOT NULL,
     output_per_mtok    REAL NOT NULL,
     cached_per_mtok    REAL NOT NULL DEFAULT 0,
+    cache_write_per_mtok REAL NOT NULL DEFAULT 0,
     chars_per_token    REAL NOT NULL DEFAULT 4.0,
     calibration_factor REAL NOT NULL DEFAULT 1.0,
     updated_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -108,6 +109,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if col not in tc_cols:
             conn.execute(f"ALTER TABLE tool_call ADD COLUMN {ddl}")
 
+    # Rate card migrations
+    rc_cols = {
+        r[1]
+        for r in conn.execute("PRAGMA table_info(rate_card)").fetchall()
+    }
+    if "cache_write_per_mtok" not in rc_cols:
+        conn.execute(
+            "ALTER TABLE rate_card "
+            "ADD COLUMN cache_write_per_mtok REAL NOT NULL DEFAULT 0"
+        )
+
     # Backfill project column from session.server_command for old rows
     _backfill_project(conn)
 
@@ -115,6 +127,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     count = conn.execute("SELECT COUNT(*) FROM rate_card").fetchone()[0]
     if count == 0:
         _seed_default_rates(conn)
+
+    # Backfill cache_write_per_mtok for existing rate cards
+    _backfill_cache_write_rates(conn)
 
 
 _SESSION_MIGRATIONS = [
@@ -165,24 +180,43 @@ def _backfill_project(conn: sqlite3.Connection) -> None:
 
 def _seed_default_rates(conn: sqlite3.Connection) -> None:
     """Insert default rate card entries for known models."""
+    # (model_id, name, input, output, cache_read, cache_write)
     defaults = [
-        # Anthropic
-        ("claude-opus-4-6", "Claude Opus 4.6", 15.0, 75.0, 1.5),
-        ("claude-sonnet-4-6", "Claude Sonnet 4.6", 3.0, 15.0, 0.3),
-        ("claude-haiku-4-5", "Claude Haiku 4.5", 0.8, 4.0, 0.08),
-        # Google
-        ("gemini-2.5-pro", "Gemini 2.5 Pro", 1.25, 10.0, 0.315),
-        ("gemini-2.5-flash", "Gemini 2.5 Flash", 0.15, 0.6, 0.0375),
-        # OpenAI
-        ("gpt-4.1", "GPT-4.1", 2.0, 8.0, 0.5),
-        ("gpt-4.1-mini", "GPT-4.1 Mini", 0.4, 1.6, 0.1),
-        ("o3", "o3", 2.0, 8.0, 0.5),
-        ("o4-mini", "o4-mini", 1.1, 4.4, 0.275),
+        # Anthropic — cache write 1.25x input, cache read 0.10x input
+        ("claude-opus-4-6", "Claude Opus 4.6", 15.0, 75.0, 1.5, 18.75),
+        ("claude-sonnet-4-6", "Claude Sonnet 4.6", 3.0, 15.0, 0.3, 3.75),
+        ("claude-haiku-4-5", "Claude Haiku 4.5", 0.8, 4.0, 0.08, 1.0),
+        # Google — no cache write premium (same as input)
+        ("gemini-2.5-pro", "Gemini 2.5 Pro", 1.25, 10.0, 0.315, 1.25),
+        ("gemini-2.5-flash", "Gemini 2.5 Flash", 0.15, 0.6, 0.0375, 0.15),
+        # OpenAI — no cache write premium (same as input)
+        ("gpt-4.1", "GPT-4.1", 2.0, 8.0, 0.5, 2.0),
+        ("gpt-4.1-mini", "GPT-4.1 Mini", 0.4, 1.6, 0.1, 0.4),
+        ("o3", "o3", 2.0, 8.0, 0.5, 2.0),
+        ("o4-mini", "o4-mini", 1.1, 4.4, 0.275, 1.1),
     ]
-    for model_id, name, inp, out, cached in defaults:
+    for model_id, name, inp, out, cached, cache_write in defaults:
         conn.execute(
             "INSERT OR IGNORE INTO rate_card "
             "(model_id, display_name, input_per_mtok, output_per_mtok, "
-            "cached_per_mtok) VALUES (?, ?, ?, ?, ?)",
-            (model_id, name, inp, out, cached),
+            "cached_per_mtok, cache_write_per_mtok) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (model_id, name, inp, out, cached, cache_write),
+        )
+
+
+def _backfill_cache_write_rates(conn: sqlite3.Connection) -> None:
+    """Set cache_write_per_mtok for existing rate cards where it's 0."""
+    rows = conn.execute(
+        "SELECT model_id, input_per_mtok FROM rate_card "
+        "WHERE cache_write_per_mtok = 0 OR cache_write_per_mtok IS NULL",
+    ).fetchall()
+    for r in rows:
+        model_id = r["model_id"]
+        input_rate = r["input_per_mtok"]
+        # Anthropic models get 1.25x write premium, others get 1.0x
+        write_rate = input_rate * 1.25 if model_id.startswith("claude-") else input_rate
+        conn.execute(
+            "UPDATE rate_card SET cache_write_per_mtok = ? WHERE model_id = ?",
+            (write_rate, model_id),
         )

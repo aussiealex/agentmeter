@@ -153,7 +153,8 @@ class RateCard:
     display_name: str = ""
     input_per_mtok: float = 0.0   # $ per million input tokens
     output_per_mtok: float = 0.0  # $ per million output tokens
-    cached_per_mtok: float = 0.0  # $ per million cached tokens
+    cached_per_mtok: float = 0.0  # $ per million cached read tokens
+    cache_write_per_mtok: float = 0.0  # $ per million cache write tokens
     chars_per_token: float = 4.0  # estimation ratio
     calibration_factor: float = 1.0  # multiplier from agentmeter calibrate
     updated_at: str = field(
