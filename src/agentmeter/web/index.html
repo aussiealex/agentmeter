@@ -478,32 +478,32 @@
 
     <div class="nav-section">
       <div class="nav-label">workspace</div>
-      <button class="nav-item">
+      <button class="nav-item" data-view="overview">
         <span class="nav-key">1</span>
         <span class="nav-name">Overview</span>
         <span></span>
       </button>
-      <button class="nav-item active">
+      <button class="nav-item active" data-view="projects">
         <span class="nav-key">2</span>
         <span class="nav-name">Projects</span>
-        <span class="badge">4</span>
+        <span class="badge" id="badge-projects">—</span>
       </button>
-      <button class="nav-item">
+      <button class="nav-item" data-view="sessions">
         <span class="nav-key">3</span>
         <span class="nav-name">Sessions</span>
-        <span class="badge">247</span>
+        <span class="badge" id="badge-sessions">—</span>
       </button>
-      <button class="nav-item">
+      <button class="nav-item" data-view="daily">
         <span class="nav-key">4</span>
         <span class="nav-name">Daily</span>
         <span></span>
       </button>
-      <button class="nav-item">
+      <button class="nav-item" data-view="strategy">
         <span class="nav-key">5</span>
         <span class="nav-name">Strategy</span>
         <span></span>
       </button>
-      <button class="nav-item">
+      <button class="nav-item" data-view="rates">
         <span class="nav-key">6</span>
         <span class="nav-name">Rates</span>
         <span></span>
@@ -677,12 +677,80 @@ function renderProjects(data) {
   });
 }
 
-fetch('/api/projects')
-  .then(function(r) { return r.json(); })
-  .then(renderProjects)
-  .catch(function(err) {
-    document.getElementById('content').textContent = 'Error: ' + err.message;
+// ─── Rates view ───
+function renderRates(rates) {
+  var main = document.getElementById('content');
+  var parts = [];
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>rates</b></div>',
+    '<div class="right"><div class="field"><span class="k">unit</span><span class="v">$ / 1M tok</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Rates</div>',
+    '<div class="view-sub"><b>', rates.length, '</b> models</div></div>',
+    '<div class="col-head" style="grid-template-columns: 2fr 100px 100px 100px 100px;">',
+    '<span>model</span><span class="num">input</span><span class="num">output</span>',
+    '<span class="num">cache · read</span><span class="num">cache · write</span></div>'
+  );
+
+  rates.forEach(function(r, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 2fr 100px 100px 100px 100px; cursor: default;">',
+      '<span class="name"><span class="label">', esc(r.displayName), '</span>',
+      '<span class="slug">', esc(r.modelId), '</span></span>',
+      '<span class="num">$', fmt(r.input), '</span>',
+      '<span class="num">$', fmt(r.output), '</span>',
+      '<span class="num">$', fmt(r.cacheRead), '</span>',
+      '<span class="num amber">$', fmt(r.cacheWrite), '</span>',
+      '</div>'
+    );
   });
+
+  main.innerHTML = parts.join('');
+}
+
+// ─── View routing ───
+var currentView = 'projects';
+
+function switchView(view) {
+  currentView = view;
+  // Update nav active state
+  $$('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  // Update status bar
+  var viewLabel = document.querySelector('.statusbar .view-name');
+  if (viewLabel) viewLabel.textContent = view;
+
+  var main = document.getElementById('content');
+  main.innerHTML = '<div class="loading">Loading...</div>';
+
+  if (view === 'projects') {
+    fetch('/api/projects').then(function(r) { return r.json(); }).then(renderProjects)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'rates') {
+    fetch('/api/rates').then(function(r) { return r.json(); }).then(renderRates)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else {
+    main.innerHTML = '<div class="loading">View "' + esc(view) + '" — coming soon</div>';
+  }
+}
+
+// Bind nav clicks
+$$('.nav-item[data-view]').forEach(function(el) {
+  el.addEventListener('click', function() { switchView(el.dataset.view); });
+});
+
+// Keyboard shortcuts: 1-6 for views
+document.addEventListener('keydown', function(e) {
+  var views = ['overview', 'projects', 'sessions', 'daily', 'strategy', 'rates'];
+  var idx = parseInt(e.key) - 1;
+  if (idx >= 0 && idx < views.length && !e.ctrlKey && !e.metaKey) {
+    switchView(views[idx]);
+  }
+});
+
+// Initial load
+switchView('projects');
 
 // Update status bar timestamp
 var ts = document.querySelector('.statusbar .dim');

@@ -31,12 +31,32 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         if self.path == "/api/projects" or self.path.startswith("/api/projects?"):
             self._api_projects()
+        elif self.path == "/api/rates":
+            self._api_rates()
         else:
             super().do_GET()
 
     def _api_projects(self):
         """Return project data as JSON."""
-        data = build_projects_data(self.db)
+        self._json_response(build_projects_data(self.db))
+
+    def _api_rates(self):
+        """Return rate card as JSON."""
+        rates = self.db.get_all_rates()
+        data = [
+            {
+                "modelId": r.model_id,
+                "displayName": r.display_name,
+                "input": r.input_per_mtok,
+                "output": r.output_per_mtok,
+                "cacheRead": r.cached_per_mtok,
+                "cacheWrite": r.cache_write_per_mtok,
+            }
+            for r in rates
+        ]
+        self._json_response(data)
+
+    def _json_response(self, data):
         body = json.dumps(data).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
