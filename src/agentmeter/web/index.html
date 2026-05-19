@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>agentmeter · projects</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:         #1e2028;
+    --sidebar:    #171920;
+    --bg-stripe:  #22242e;
+    --bg-hover:   #262834;
+    --bg-active:  #2a2d3a;
+
+    --rule:       #2c2f3a;
+    --rule-2:     #25272f;
+    --rule-3:     #1f2129;
+
+    --fg:         #e8e8ec;
+    --fg-dim:     #c5c7d0;
+    --fg-mute:    #a0a4b0;
+    --fg-faint:   #5e6270;
+    --fg-ghost:   #393b46;
+
+    --amber:      #f0a030;
+    --amber-soft: #c98a36;
+    --amber-low:  #6b5638;
+
+    --green:      #4aba6a;
+    --green-dim:  #2f6b3f;
+
+    --red:        #d45555;
+    --red-dim:    #6c2b2b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); }
+  body {
+    color: var(--fg);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    font-feature-settings: "ss01", "ss02", "calt", "zero";
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+  ::selection { background: var(--amber-low); color: var(--fg); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--fg-ghost); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-faint); }
+
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+    grid-template-rows: 1fr 28px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ─────────── sidebar ─────────── */
+  aside.sidebar {
+    grid-row: 1 / 3;
+    background: var(--sidebar);
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    padding: 22px 20px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand .mark {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+  .brand .mark .dot { color: var(--amber); }
+  .brand .ver {
+    font-size: 12px;
+    color: var(--fg-faint);
+    margin-left: auto;
+  }
+
+  .nav-section { padding: 16px 0 0; }
+  .nav-label {
+    padding: 0 20px 8px;
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .nav-item {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 20px;
+    color: var(--fg-mute);
+    width: 100%;
+    text-align: left;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .nav-item:hover {
+    color: var(--fg);
+    background: var(--bg-hover);
+  }
+  .nav-item.active {
+    color: var(--fg);
+    background: var(--bg-active);
+    border-left-color: var(--amber);
+  }
+  .nav-item.active .nav-key { color: var(--amber); }
+  .nav-item .nav-key {
+    color: var(--fg-faint);
+    font-size: 12px;
+  }
+  .nav-item .nav-name { font-size: 14px; }
+
+  /* sessions badge */
+  .badge {
+    font-size: 11px;
+    color: var(--fg-mute);
+    background: var(--bg-stripe);
+    border: 1px solid var(--rule);
+    padding: 1px 7px;
+    line-height: 1.5;
+  }
+  .nav-item.active .badge {
+    color: var(--amber);
+    border-color: var(--amber-low);
+    background: rgba(240, 160, 48, 0.08);
+  }
+
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 18px 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--fg-mute);
+  }
+  .sidebar-foot .k { color: var(--fg-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+  .sidebar-foot .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .sidebar-foot .v { color: var(--fg-dim); }
+  .sidebar-foot .v.cost { color: var(--amber); }
+  .sidebar-foot .progress {
+    height: 4px;
+    background: var(--bg-stripe);
+    margin-top: 6px;
+    position: relative;
+  }
+  .sidebar-foot .progress i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--amber);
+    width: 50.8%;
+  }
+  .sidebar-foot .pct {
+    font-size: 11px;
+    color: var(--fg-faint);
+    margin-top: 4px;
+  }
+
+  /* ─────────── content ─────────── */
+  main.content {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 18px 28px 16px;
+    border-bottom: 1px solid var(--rule);
+    gap: 28px;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .crumb { color: var(--fg-mute); font-size: 13px; }
+  .crumb b { color: var(--fg); font-weight: 500; }
+  .crumb .sep { color: var(--fg-faint); margin: 0 8px; }
+  .topbar .right { margin-left: auto; display: flex; gap: 24px; align-items: center; }
+  .topbar .right .field { display: flex; gap: 8px; align-items: center; }
+  .topbar .right .field .k { color: var(--fg-faint); }
+  .topbar .right .field .v { color: var(--fg-dim); }
+
+  .view-head {
+    padding: 26px 28px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .view-title {
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .view-sub { color: var(--fg-mute); font-size: 13px; }
+  .view-sub b { color: var(--fg-dim); font-weight: 400; }
+  .view-actions { margin-left: auto; display: flex; gap: 18px; font-size: 13px; color: var(--fg-mute); }
+  .view-actions button:hover { color: var(--fg); }
+  .view-actions .on { color: var(--amber); }
+
+  /* ─────────── table ─────────── */
+  .col-head {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 12px 28px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--fg-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    background: var(--sidebar);
+  }
+  .col-head .num { text-align: right; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 16px 28px;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rule-3);
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .row.stripe { background: var(--bg-stripe); }
+  .row:hover { background: var(--bg-hover); }
+  .row.open { background: var(--bg-active); border-bottom-color: transparent; }
+  .row .caret { color: var(--fg-faint); font-size: 12px; }
+  .row.open .caret { color: var(--amber); }
+  .row .name {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .row .name .label { color: var(--fg); font-weight: 500; font-size: 15px; }
+  .row .name .slug { color: var(--fg-mute); font-size: 12px; }
+  .row .num { text-align: right; color: var(--fg-dim); }
+  .row .cost { text-align: right; color: var(--amber); font-weight: 500; font-size: 15px; }
+  .row .last { text-align: right; color: var(--fg-mute); font-size: 13px; }
+
+  /* share cell with mini bar */
+  .row .share-cell {
+    display: grid;
+    grid-template-columns: 1fr 56px;
+    gap: 10px;
+    align-items: center;
+  }
+  .row .share-cell .track {
+    height: 4px;
+    background: var(--fg-ghost);
+    position: relative;
+  }
+  .row .share-cell .track i {
+    position: absolute; inset: 0 auto 0 0;
+    background: var(--amber);
+  }
+  .row .share-cell .pct {
+    text-align: right;
+    color: var(--fg-dim);
+    font-size: 13px;
+  }
+
+  /* ─────────── expanded panel ─────────── */
+  .expanded {
+    background: var(--bg-active);
+    border-bottom: 1px solid var(--rule);
+    padding: 8px 28px 28px;
+  }
+  .exp-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    margin-top: 4px;
+  }
+  .exp-cell {
+    padding: 22px 26px 22px 0;
+    border-right: 1px solid var(--rule);
+  }
+  .exp-cell:last-child { border-right: 0; padding-right: 0; }
+  .exp-cell + .exp-cell { padding-left: 26px; }
+  .exp-h {
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-bottom: 14px;
+  }
+
+  /* cost split lines */
+  .split-line {
+    display: grid;
+    grid-template-columns: 68px 60px 1fr 90px;
+    gap: 12px;
+    padding: 5px 0;
+    align-items: center;
+    font-size: 14px;
+  }
+  .split-line .k { color: var(--fg-dim); }
+  .split-line .pct { color: var(--fg-mute); text-align: right; }
+  .split-line .bar { height: 6px; background: var(--fg-ghost); position: relative; }
+  .split-line .bar i { position: absolute; inset: 0 auto 0 0; }
+  .split-line.cache  .bar i { background: var(--amber); }
+  .split-line.output .bar i { background: var(--amber-soft); }
+  .split-line.input  .bar i { background: var(--fg-faint); }
+  .split-line .v { color: var(--amber); text-align: right; font-size: 15px; font-weight: 500; }
+  .split-line.output .v { color: var(--amber-soft); }
+  .split-line.input  .v { color: var(--fg-dim); }
+  .split-foot {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule-2);
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .split-foot b { color: var(--fg-dim); font-weight: 400; }
+  .split-foot .v { color: var(--green); }
+
+  /* tool lines */
+  .tool-line {
+    display: grid;
+    grid-template-columns: 22px 1fr 80px 80px;
+    gap: 12px;
+    padding: 5px 0;
+    align-items: baseline;
+    font-size: 14px;
+  }
+  .tool-line .idx { color: var(--fg-faint); font-size: 12px; }
+  .tool-line .k   { color: var(--fg); font-weight: 500; }
+  .tool-line .calls { color: var(--fg-mute); text-align: right; font-size: 13px; }
+  .tool-line .bytes { color: var(--fg-dim); text-align: right; }
+  .tool-line.more .k { color: var(--fg-mute); font-weight: 400; }
+  .tool-line.more .bytes { color: var(--fg-mute); }
+  .tool-divider {
+    border-top: 1px solid var(--rule-2);
+    margin: 8px 0 6px;
+  }
+
+  /* outcomes grid */
+  .outcomes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 22px;
+  }
+  .stat .stat-v {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+  .stat .stat-v .small {
+    color: var(--fg-mute);
+    font-size: 14px;
+    font-weight: 400;
+  }
+  .stat .stat-v.green  { color: var(--green); }
+  .stat .stat-v.amber  { color: var(--amber); }
+  .stat .stat-l {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+    margin-top: 4px;
+  }
+
+  /* expanded foot meta */
+  .exp-foot {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .exp-foot span b { color: var(--fg-dim); font-weight: 400; }
+  .exp-foot .actions { margin-left: auto; display: flex; gap: 14px; }
+  .exp-foot .actions button {
+    color: var(--fg-mute);
+    border: 1px solid var(--rule);
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .exp-foot .actions button:hover { color: var(--fg); border-color: var(--fg-faint); }
+  .exp-foot .actions button kbd {
+    color: var(--amber);
+    margin-right: 6px;
+  }
+
+  /* totals row */
+  .totals {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 16px 28px;
+    border-top: 1px solid var(--rule);
+    background: var(--sidebar);
+    font-size: 14px;
+  }
+  .totals .lbl { color: var(--fg-mute); text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; }
+  .totals .v { text-align: right; color: var(--fg-dim); }
+  .totals .v.cost { color: var(--amber); font-weight: 500; font-size: 15px; }
+
+  /* ─────────── status bar ─────────── */
+  .statusbar {
+    grid-column: 2 / 3;
+    border-top: 1px solid var(--rule);
+    background: var(--sidebar);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    font-size: 12px;
+    color: var(--fg-mute);
+    gap: 20px;
+    height: 28px;
+  }
+  .statusbar .sep { color: var(--fg-faint); }
+  .statusbar .pulse {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px rgba(74, 186, 106, 0.6);
+    display: inline-block;
+    margin-right: 7px;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+  .statusbar .right { margin-left: auto; display: flex; gap: 18px; }
+  .statusbar kbd {
+    color: var(--fg);
+    background: var(--bg-stripe);
+    border: 1px solid var(--rule);
+    padding: 0 5px;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+
+  /* tiny helpers */
+  .green { color: var(--green); }
+  .amber { color: var(--amber); }
+  .muted { color: var(--fg-mute); }
+  .dim   { color: var(--fg-dim); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ─────────── sidebar ─────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="mark">agent<span class="dot">·</span>meter</span>
+      <span class="ver">v0.4.2</span>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">workspace</div>
+      <button class="nav-item">
+        <span class="nav-key">1</span>
+        <span class="nav-name">Overview</span>
+        <span></span>
+      </button>
+      <button class="nav-item active">
+        <span class="nav-key">2</span>
+        <span class="nav-name">Projects</span>
+        <span class="badge">4</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-key">3</span>
+        <span class="nav-name">Sessions</span>
+        <span class="badge">247</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-key">4</span>
+        <span class="nav-name">Daily</span>
+        <span></span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-key">5</span>
+        <span class="nav-name">Strategy</span>
+        <span></span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-key">6</span>
+        <span class="nav-name">Rates</span>
+        <span></span>
+      </button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="k">billing cycle</div>
+      <div class="row"><span class="v">may 2026</span><span class="v">day 18 / 31</span></div>
+      <div style="margin-top: 10px;">
+        <div class="row"><span class="v">spent</span><span class="v cost">$2,538</span></div>
+        <div class="row"><span class="v">cap</span><span class="v">$5,000</span></div>
+        <div class="progress"><i></i></div>
+        <div class="pct">50.8% · projected eom $4,371</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─────────── content ─────────── -->
+  <main class="content">
+
+    <div class="topbar">
+      <div class="crumb">
+        <span>workspace</span><span class="sep">/</span><b>projects</b>
+      </div>
+      <div class="right">
+        <div class="field"><span class="k">scope</span><span class="v">month</span></div>
+        <div class="field"><span class="k">window</span><span class="v">2026-05-01 → 18</span></div>
+        <div class="field"><span class="k">currency</span><span class="v">USD</span></div>
+      </div>
+    </div>
+
+    <div class="view-head">
+      <div class="view-title">Projects</div>
+      <div class="view-sub">
+        <b>4</b> tracked · <b>34</b> sessions · updated <b>2h ago</b>
+      </div>
+      <div class="view-actions">
+        <button class="on">sort:cost</button>
+        <button>sort:name</button>
+        <button>sort:recent</button>
+      </div>
+    </div>
+
+    <div class="col-head">
+      <span></span>
+      <span>project</span>
+      <span>share · mtd</span>
+      <span class="num">sessions</span>
+      <span class="num">last run</span>
+      <span class="num">cost · mtd</span>
+    </div>
+
+    <!-- row 1 — DeviceGuardian (open) -->
+    <div class="row open">
+      <span class="caret">▾</span>
+      <span class="name">
+        <span class="label">DeviceGuardian</span>
+        <span class="slug">acme-corp/device-guardian</span>
+      </span>
+      <span class="share-cell">
+        <span class="track"><i style="width: 67.5%;"></i></span>
+        <span class="pct">67.5%</span>
+      </span>
+      <span class="num">14</span>
+      <span class="last">2h ago</span>
+      <span class="cost">$1,713.04</span>
+    </div>
+
+    <!-- expanded panel -->
+    <div class="expanded">
+      <div class="exp-grid">
+        <!-- cost split -->
+        <div class="exp-cell">
+          <div class="exp-h">cost split · $1,713.04</div>
+
+          <div class="split-line cache">
+            <span class="k">cache</span>
+            <span class="pct">91.2%</span>
+            <span class="bar"><i style="width: 91.2%;"></i></span>
+            <span class="v">$1,562.29</span>
+          </div>
+          <div class="split-line output">
+            <span class="k">output</span>
+            <span class="pct">5.1%</span>
+            <span class="bar"><i style="width: 5.1%;"></i></span>
+            <span class="v">$87.36</span>
+          </div>
+          <div class="split-line input">
+            <span class="k">input</span>
+            <span class="pct">3.7%</span>
+            <span class="bar"><i style="width: 3.7%;"></i></span>
+            <span class="v">$63.39</span>
+          </div>
+
+          <div class="split-foot">
+            <span><b>1.4B</b> tokens · cache hit <span class="v">94.6%</span></span>
+            <span class="green">saved ~$16,288 vs uncached</span>
+          </div>
+        </div>
+
+        <!-- top tools -->
+        <div class="exp-cell">
+          <div class="exp-h">top tools · by data volume</div>
+          <div class="tool-line">
+            <span class="idx">01</span>
+            <span class="k">Read</span>
+            <span class="calls">8,914 ×</span>
+            <span class="bytes">412.8 MB</span>
+          </div>
+          <div class="tool-line">
+            <span class="idx">02</span>
+            <span class="k">Edit</span>
+            <span class="calls">2,107 ×</span>
+            <span class="bytes">189.2 MB</span>
+          </div>
+          <div class="tool-line">
+            <span class="idx">03</span>
+            <span class="k">Bash</span>
+            <span class="calls">1,438 ×</span>
+            <span class="bytes">67.4 MB</span>
+          </div>
+          <div class="tool-divider"></div>
+          <div class="tool-line more">
+            <span class="idx"></span>
+            <span class="k">+ 11 more tools</span>
+            <span class="calls">3,802 ×</span>
+            <span class="bytes">98.1 MB</span>
+          </div>
+          <div class="split-foot" style="margin-top: 18px;">
+            <span><b>17.3k</b> total calls</span>
+            <span><b>767.5 MB</b> data moved</span>
+          </div>
+        </div>
+
+        <!-- outcomes -->
+        <div class="exp-cell">
+          <div class="exp-h">outcomes</div>
+          <div class="outcomes-grid">
+            <div class="stat">
+              <div class="stat-v green">12</div>
+              <div class="stat-l">commits</div>
+            </div>
+            <div class="stat">
+              <div class="stat-v green">980<span class="small"> / 994</span></div>
+              <div class="stat-l">tests passed</div>
+            </div>
+            <div class="stat">
+              <div class="stat-v amber">$142.75</div>
+              <div class="stat-l">cost · commit</div>
+            </div>
+            <div class="stat">
+              <div class="stat-v green">3</div>
+              <div class="stat-l">prs merged</div>
+            </div>
+            <div class="stat">
+              <div class="stat-v">184</div>
+              <div class="stat-l">files touched</div>
+            </div>
+            <div class="stat">
+              <div class="stat-v">$1.72</div>
+              <div class="stat-l">cost · test</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exp-foot">
+        <span>models: <b>sonnet-4.5 · haiku-4.5</b></span>
+        <span>branch: <b>main</b></span>
+        <span>path: <b>~/code/acme-corp/device-guardian</b></span>
+        <div class="actions">
+          <button><kbd>S</kbd>sessions</button>
+          <button><kbd>D</kbd>daily</button>
+          <button><kbd>E</kbd>export</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- row 2 — LocalLLM (stripe) -->
+    <div class="row stripe">
+      <span class="caret">▸</span>
+      <span class="name">
+        <span class="label">LocalLLM</span>
+        <span class="slug">you/local-llm-runner</span>
+      </span>
+      <span class="share-cell">
+        <span class="track"><i style="width: 11%;"></i></span>
+        <span class="pct">11.0%</span>
+      </span>
+      <span class="num">6</span>
+      <span class="last">3d ago</span>
+      <span class="cost">$280.96</span>
+    </div>
+
+    <!-- row 3 — MailSift -->
+    <div class="row">
+      <span class="caret">▸</span>
+      <span class="name">
+        <span class="label">MailSift</span>
+        <span class="slug">you/mailsift</span>
+      </span>
+      <span class="share-cell">
+        <span class="track"><i style="width: 9.5%;"></i></span>
+        <span class="pct">9.5%</span>
+      </span>
+      <span class="num">7</span>
+      <span class="last">2d ago</span>
+      <span class="cost">$242.18</span>
+    </div>
+
+    <!-- row 4 — AgentMeter (stripe) -->
+    <div class="row stripe">
+      <span class="caret">▸</span>
+      <span class="name">
+        <span class="label">AgentMeter</span>
+        <span class="slug">you/agentmeter</span>
+      </span>
+      <span class="share-cell">
+        <span class="track"><i style="width: 7.7%;"></i></span>
+        <span class="pct">7.7%</span>
+      </span>
+      <span class="num">5</span>
+      <span class="last">13h ago</span>
+      <span class="cost">$196.42</span>
+    </div>
+
+    <!-- totals -->
+    <div class="totals">
+      <span></span>
+      <span class="lbl">total · 4 projects + scratch</span>
+      <span></span>
+      <span class="v">34</span>
+      <span class="v">—</span>
+      <span class="v cost">$2,538.00</span>
+    </div>
+
+  </main>
+
+  <!-- ─────────── status bar ─────────── -->
+  <div class="statusbar">
+    <span><span class="pulse"></span>live</span>
+    <span class="sep">│</span>
+    <span>view: <span class="dim">projects</span></span>
+    <span class="sep">│</span>
+    <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
+    <span><kbd>/</kbd> filter</span>
+    <span><kbd>→</kbd> expand</span>
+    <span><kbd>1</kbd>–<kbd>6</kbd> menu</span>
+    <span class="right">
+      <span>tail -f ~/.agentmeter/events.log</span>
+      <span class="sep">│</span>
+      <span class="dim">2026-05-19 14:22:08 UTC</span>
+    </span>
+  </div>
+
+</div>
+</body>
+</html>
