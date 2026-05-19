@@ -73,9 +73,12 @@ src/agentmeter/
 ├── cli_rates.py         # Rate card view/edit
 ├── cli_strategy.py      # Per-project cost analysis and advice
 ├── cli_summary.py       # Compact cost context for agent injection
+├── cli_dashboard.py     # Web dashboard server + API endpoints
 ├── outcomes.py          # Session outcome detection from Bash calls
 ├── session_reader.py    # Read real tokens from Claude Code JSONL
 ├── hook.py              # Legacy entry point (imports from hooks/claude.py)
+├── web/                 # Web dashboard (single HTML + JS)
+│   └── index.html       # Dashboard UI — 6 views, fetches from /api/*
 ├── hooks/               # Multi-agent hook system (Path 1)
 │   ├── __init__.py      # Re-exports, backwards compat
 │   ├── base.py          # NormalisedToolEvent → DB recording logic
@@ -133,6 +136,11 @@ agentmeter forecast           # monthly spend projection
 agentmeter advise             # spend analysis + recommendations
 agentmeter strategy           # per-project cost analysis + advice
 agentmeter summary            # compact cost context for agent injection
+
+# Web dashboard
+agentmeter dashboard          # open dashboard at localhost:8070
+agentmeter dashboard -p 9090  # custom port
+agentmeter dashboard --no-open # don't auto-open browser
 
 # Data export
 agentmeter export             # JSONL to stdout
