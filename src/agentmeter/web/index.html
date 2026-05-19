@@ -708,6 +708,47 @@ function renderRates(rates) {
   main.innerHTML = parts.join('');
 }
 
+// ─── Sessions view ───
+function renderSessions(data) {
+  var main = document.getElementById('content');
+  var ss = data.sessions;
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>sessions</b></div>',
+    '<div class="right"><div class="field"><span class="k">showing</span><span class="v">', ss.length, ' recent</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Sessions</div>',
+    '<div class="view-sub">recent first</div></div>',
+    '<div class="col-head" style="grid-template-columns: 90px 1fr 120px 70px 80px 100px 30px;">',
+    '<span>id</span><span>project</span><span>model</span>',
+    '<span class="num">calls</span><span class="num">tokens</span>',
+    '<span class="num">cost</span><span class="num"></span></div>'
+  );
+
+  ss.forEach(function(s, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    var check = s.hasOutcome ? '<span class="green">✓</span>' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 90px 1fr 120px 70px 80px 100px 30px; cursor: default;" title="',
+      esc(s.fullId), '&#10;', esc(s.started), '&#10;', esc(s.outcome || 'no outcome'), '">',
+      '<span class="dim" style="font-size:12px">', esc(s.id), '</span>',
+      '<span class="name"><span class="label" style="font-size:14px">', esc(s.project), '</span></span>',
+      '<span class="dim" style="font-size:12px">', esc(s.model.replace('claude-', '').replace('claude_', '')), '</span>',
+      '<span class="num" style="font-size:13px">', s.toolCalls, '</span>',
+      '<span class="num" style="font-size:13px">', fmtTokens(s.tokens), '</span>',
+      '<span class="cost" style="font-size:14px">', s.cost > 0 ? '$' + fmt(s.cost) : '—', '</span>',
+      '<span class="num">', check, '</span>',
+      '</div>'
+    );
+  });
+
+  main.innerHTML = parts.join('');
+
+  // Update badge
+  var badge = document.getElementById('badge-sessions');
+  if (badge) badge.textContent = ss.length;
+}
+
 // ─── Daily view ───
 function renderDaily(data) {
   var main = document.getElementById('content');
@@ -771,6 +812,9 @@ function switchView(view) {
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'rates') {
     fetch('/api/rates').then(function(r) { return r.json(); }).then(renderRates)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'sessions') {
+    fetch('/api/sessions').then(function(r) { return r.json(); }).then(renderSessions)
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'daily') {
     fetch('/api/daily').then(function(r) { return r.json(); }).then(renderDaily)

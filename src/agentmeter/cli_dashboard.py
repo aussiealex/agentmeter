@@ -35,6 +35,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._api_rates()
         elif self.path == "/api/daily" or self.path.startswith("/api/daily?"):
             self._api_daily()
+        elif self.path == "/api/sessions" or self.path.startswith("/api/sessions?"):
+            self._api_sessions()
         else:
             super().do_GET()
 
@@ -45,6 +47,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_daily(self):
         """Return daily totals with cost as JSON."""
         self._json_response(build_daily_data(self.db))
+
+    def _api_sessions(self):
+        """Return session list with cost as JSON."""
+        self._json_response(build_sessions_data(self.db))
 
     def _api_rates(self):
         """Return rate card as JSON."""
@@ -249,6 +255,85 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
             "end": datetime.now().strftime("%Y-%m-%d"),
         },
     }
+
+
+def build_sessions_data(db: MeterDB) -> dict:
+    """Build session list with cost from real token data."""
+    sessions = db.get_sessions(limit=50)
+    session_stats = db.get_session_stats(limit=50)
+    stats_map = {s.session_id: s for s in session_stats}
+
+    rows = []
+    for s in sessions:
+        cmd = s.server_command or ""
+        project = cmd.rstrip("/").rsplit("/", 1)[-1] if cmd else ""
+
+        # Real cost
+        cost_val = 0.0
+        tokens_total = 0
+        model = ""
+        llm_calls = 0
+        jsonl_path = find_session_jsonl(s.id, s.server_command)
+        if jsonl_path:
+            tokens = read_session_tokens_from_file(jsonl_path)
+            if tokens and tokens.llm_call_count > 0:
+                rate = db.get_rate(tokens.model_id)
+                if rate:
+                    cost_data = calculate_session_cost(tokens, rate)
+                    cost_val = cost_data.total_cost
+                tokens_total = (
+                    tokens.input_tokens
+                    + tokens.cache_creation_tokens
+                    + tokens.cache_read_tokens
+                    + tokens.output_tokens
+                )
+                model = tokens.model_id
+                llm_calls = tokens.llm_call_count
+
+        # Tool call count from stats
+        ss = stats_map.get(s.id)
+        tool_calls = ss.total_calls if ss else 0
+
+        # Duration
+        duration = ""
+        if s.started_at and s.ended_at:
+            try:
+                start = datetime.fromisoformat(s.started_at)
+                end = datetime.fromisoformat(s.ended_at)
+                mins = int((end - start).total_seconds() / 60)
+                duration = f"{mins}m"
+            except (ValueError, TypeError):
+                pass
+
+        # Outcome
+        outcome = ""
+        if s.commits:
+            outcome = f"{s.commits} commits"
+        if s.tests_passed:
+            outcome += (", " if outcome else "")
+            outcome += f"{s.tests_passed} passed"
+        if s.tests_failed:
+            outcome += f", {s.tests_failed} failed"
+
+        rows.append({
+            "id": s.id[:12],
+            "fullId": s.id,
+            "project": project,
+            "model": model,
+            "duration": duration,
+            "toolCalls": tool_calls,
+            "llmCalls": llm_calls,
+            "tokens": tokens_total,
+            "cost": round(cost_val, 2),
+            "started": s.started_at[:19].replace("T", " ")
+            if s.started_at else "",
+            "outcome": outcome,
+            "hasOutcome": bool(
+                s.commits or s.tests_passed,
+            ),
+        })
+
+    return {"sessions": rows}
 
 
 def build_daily_data(db: MeterDB, days: int = 14) -> dict:
