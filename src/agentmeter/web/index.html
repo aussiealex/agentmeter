@@ -887,6 +887,89 @@ function renderDaily(data) {
   main.innerHTML = parts.join('');
 }
 
+// ─── Strategy view ───
+function renderStrategy(data) {
+  var main = document.getElementById('content');
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>strategy</b></div></div>',
+    '<div class="view-head"><div class="view-title">Strategy</div>',
+    '<div class="view-sub">budget rules · circuit breakers · recommendations</div></div>'
+  );
+
+  // Budgets
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">budget rules</div>');
+  if (data.budgets.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No budget rules configured. Use: agentmeter budget set daily 200</div>');
+  } else {
+    data.budgets.forEach(function(b) {
+      parts.push(
+        '<div style="padding:6px 0;font-size:14px">',
+        '<span class="dim">', esc(b.scope), '</span> ',
+        '<span style="color:var(--fg)">', b.maxCalls, ' calls</span> ',
+        '<span class="muted">for </span><span class="dim">', esc(b.serverName), '</span> ',
+        '<span class="muted">→ </span>',
+        b.action === 'deny' ? '<span class="amber">deny</span>' : '<span class="green">warn</span>',
+        '</div>'
+      );
+    });
+  }
+  parts.push('</div>');
+
+  // Breakers
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">circuit breakers</div>');
+  if (data.breakers.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No breakers configured. Use: agentmeter breaker set 20 60</div>');
+  } else {
+    data.breakers.forEach(function(b) {
+      parts.push(
+        '<div style="padding:6px 0;font-size:14px">',
+        '<span style="color:var(--fg)">', b.maxCalls, ' calls</span> ',
+        '<span class="muted">in </span><span class="dim">', b.windowSeconds, 's</span> ',
+        '<span class="muted">→ cooldown </span><span class="dim">', b.cooldownSeconds, 's</span> ',
+        '<span class="muted">for </span><span class="dim">', esc(b.serverName), '</span>',
+        '</div>'
+      );
+    });
+  }
+
+  // Recent trips
+  if (data.recentTrips.length > 0) {
+    parts.push('<div style="margin-top:12px"><div class="exp-h" style="color:var(--red)">recent trips</div>');
+    data.recentTrips.forEach(function(t) {
+      parts.push(
+        '<div style="padding:4px 0;font-size:13px">',
+        '<span class="dim">', esc(t.trippedAt.slice(0,19).replace('T',' ')), '</span> ',
+        '<span class="muted">', esc(t.serverName), ' — ', t.callCount, ' calls in ', t.windowSeconds, 's</span>',
+        '</div>'
+      );
+    });
+    parts.push('</div>');
+  }
+  parts.push('</div>');
+
+  // Recommendations
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">recommendations</div>');
+  if (data.recommendations.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No recommendations — usage patterns look healthy.</div>');
+  } else {
+    data.recommendations.forEach(function(r, i) {
+      parts.push(
+        '<div style="padding:8px 0;font-size:14px;border-bottom:1px solid var(--rule-3)">',
+        '<span class="amber" style="font-size:12px;margin-right:8px">', (i+1), '.</span>',
+        '<span class="dim">', esc(r), '</span></div>'
+      );
+    });
+  }
+  parts.push('</div>');
+
+  main.innerHTML = parts.join('');
+}
+
 // ─── View routing ───
 var currentView = 'projects';
 
@@ -914,6 +997,9 @@ function switchView(view) {
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'sessions') {
     fetch('/api/sessions').then(function(r) { return r.json(); }).then(renderSessions)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'strategy') {
+    fetch('/api/strategy').then(function(r) { return r.json(); }).then(renderStrategy)
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'daily') {
     fetch('/api/daily').then(function(r) { return r.json(); }).then(renderDaily)

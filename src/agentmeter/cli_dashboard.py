@@ -39,6 +39,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._api_sessions()
         elif self.path == "/api/overview":
             self._api_overview()
+        elif self.path == "/api/strategy":
+            self._api_strategy()
         else:
             super().do_GET()
 
@@ -57,6 +59,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_overview(self):
         """Return overview KPIs as JSON."""
         self._json_response(build_overview_data(self.db))
+
+    def _api_strategy(self):
+        """Return strategy data — budgets, breakers, recommendations."""
+        self._json_response(build_strategy_data(self.db))
 
     def _api_rates(self):
         """Return rate card as JSON."""
@@ -263,6 +269,133 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
     }
 
 
+def build_strategy_data(db: MeterDB) -> dict:
+    """Build strategy data — budgets, breakers, recommendations."""
+    budgets = db.get_budgets()
+    breakers = db.get_breakers()
+    trips = db.get_breaker_trips(limit=10)
+
+    proj_data = build_projects_data(db)
+    ps = proj_data["projects"]
+
+    # Generate recommendations from project data
+    recs = []
+
+    # Per-project recommendations
+    for p in ps:
+        cs = p["costSplit"]
+        name = p["name"]
+        sessions = p["sessions"]
+        if sessions == 0:
+            continue
+
+        avg_calls = p.get("llmCalls", 0) / sessions
+        o = p["outcomes"]
+
+        # Session splitting
+        if avg_calls > 200:
+            saving = int(p["cost"] * 0.25)
+            recs.append(
+                f"{name}: avg {int(avg_calls)} LLM calls/"
+                f"session. Splitting at ~100 could save "
+                f"~${saving} (25% of spend)."
+            )
+
+        # Cache dominance
+        if cs["cachePct"] > 90 and p["cost"] > 50:
+            recs.append(
+                f"{name}: cache is {cs['cachePct']}% of cost. "
+                f"Each turn replays the entire conversation — "
+                f"split long sessions with handoff briefs."
+            )
+
+        # Tool-specific: large data tools
+        for t in p["tools"]:
+            if t["name"] == "Bash" and t["bytes"] > 500_000:
+                recs.append(
+                    f"{name}: Bash produced "
+                    f"{_fmt_bytes(t['bytes'])} of output. "
+                    f"Pipe through tail/head to avoid "
+                    f"polluting context."
+                )
+            if t["name"] == "Read" and t["calls"] > 50:
+                recs.append(
+                    f"{name}: {t['calls']} Read calls "
+                    f"pulled {_fmt_bytes(t['bytes'])}. "
+                    f"Each read inflates context. Use line "
+                    f"offsets to read only what you need."
+                )
+
+        # High cost per commit
+        if o["commits"] > 0 and o["costPerCommit"] > 50:
+            recs.append(
+                f"{name}: ${o['costPerCommit']:.0f}/commit. "
+                f"Write detailed prompts with acceptance "
+                f"criteria to reduce iterations."
+            )
+
+        # Sessions with no outcome
+        if o["commits"] == 0 and o["testsPassed"] == 0 and p["cost"] > 20:
+                recs.append(
+                    f"{name}: ${p['cost']:.0f} spent with no "
+                    f"commits or test results. Consider "
+                    f"setting clearer task goals upfront."
+                )
+
+    # Global recommendations
+    if not budgets:
+        recs.append(
+            "No budget rules set. Use "
+            "'agentmeter budget set daily 200' to cap "
+            "daily tool calls and catch runaway sessions."
+        )
+    if not breakers:
+        recs.append(
+            "No circuit breakers configured. Use "
+            "'agentmeter breaker set 20 60' to auto-trip "
+            "when call velocity spikes (20 calls in 60s)."
+        )
+
+    # Single project dominance
+    if ps and ps[0]["sharePct"] > 60:
+        recs.append(
+            f"{ps[0]['name']} is {ps[0]['sharePct']}% of "
+            f"total spend. Review whether session lengths "
+            f"are proportionate to task complexity."
+        )
+
+    return {
+        "budgets": [
+            {
+                "scope": b.scope,
+                "serverName": b.server_name or "all",
+                "maxCalls": b.max_calls,
+                "action": b.action,
+            }
+            for b in budgets
+        ],
+        "breakers": [
+            {
+                "serverName": b.server_name or "all",
+                "maxCalls": b.max_calls,
+                "windowSeconds": b.window_seconds,
+                "cooldownSeconds": b.cooldown_seconds,
+            }
+            for b in breakers
+        ],
+        "recentTrips": [
+            {
+                "serverName": t.server_name,
+                "callCount": t.call_count,
+                "windowSeconds": t.window_seconds,
+                "trippedAt": t.tripped_at,
+            }
+            for t in trips
+        ],
+        "recommendations": recs,
+    }
+
+
 def build_overview_data(db: MeterDB) -> dict:
     """Build overview KPIs from project and session data."""
     proj_data = build_projects_data(db)
@@ -440,6 +573,17 @@ def build_daily_data(db: MeterDB, days: int = 14) -> dict:
         "days": rows,
         "totalCost": round(sum(daily_costs.values()), 2),
     }
+
+
+def _fmt_bytes(b: int) -> str:
+    """Format bytes to human-readable string."""
+    if b >= 1_000_000_000:
+        return f"{b / 1_000_000_000:.1f} GB"
+    if b >= 1_000_000:
+        return f"{b / 1_000_000:.1f} MB"
+    if b >= 1_000:
+        return f"{b / 1_000:.1f} KB"
+    return f"{b} B"
 
 
 def _relative_time(iso_str: str) -> str:
