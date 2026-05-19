@@ -53,6 +53,8 @@ class TestSessionOperations:
 
     def test_end_session(self, tmp_db: MeterDB) -> None:
         _make_session(tmp_db)
+        for i in range(5):
+            _make_call(tmp_db, tool_name=f"tool-{i}")
         tmp_db.end_session("sess-001", total_calls=5)
         stats = tmp_db.get_session_stats()
         assert stats[0].total_calls == 5

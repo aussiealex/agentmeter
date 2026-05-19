@@ -33,7 +33,8 @@ def get_session_stats(
     params.append(limit)
 
     query = (
-        "SELECT s.id, s.name, s.server_name, s.started_at, s.total_calls, "
+        "SELECT s.id, s.name, s.server_name, s.server_command, s.started_at, "
+        "COUNT(tc.id) as total_calls, "
         "COALESCE(SUM(tc.is_error), 0) as total_errors, "
         "COALESCE(SUM(tc.elapsed_ms), 0) as total_elapsed_ms "
         "FROM session s "
@@ -71,10 +72,19 @@ def get_session_stats(
             for r in tool_rows
         ]
 
+        # Derive display name: explicit name > project from cwd > session ID
+        display_name = s["name"]
+        if not display_name:
+            cmd = s["server_command"] or ""
+            if cmd and "/" in cmd:
+                display_name = cmd.rstrip("/").rsplit("/", 1)[-1]
+        if not display_name:
+            display_name = s["id"]
+
         results.append(
             SessionStats(
                 session_id=s["id"],
-                session_name=s["name"] or s["id"],
+                session_name=display_name,
                 server_name=s["server_name"],
                 started_at=s["started_at"],
                 total_calls=s["total_calls"] or 0,
