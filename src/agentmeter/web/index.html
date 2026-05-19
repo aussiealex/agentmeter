@@ -463,6 +463,7 @@
   .amber { color: var(--amber); }
   .muted { color: var(--fg-mute); }
   .dim   { color: var(--fg-dim); }
+  .loading { padding: 40px 28px; color: var(--fg-mute); }
 </style>
 </head>
 <body>
@@ -521,226 +522,12 @@
     </div>
   </aside>
 
-  <!-- ─────────── content ─────────── -->
-  <main class="content">
-
-    <div class="topbar">
-      <div class="crumb">
-        <span>workspace</span><span class="sep">/</span><b>projects</b>
-      </div>
-      <div class="right">
-        <div class="field"><span class="k">scope</span><span class="v">month</span></div>
-        <div class="field"><span class="k">window</span><span class="v">2026-05-01 → 18</span></div>
-        <div class="field"><span class="k">currency</span><span class="v">USD</span></div>
-      </div>
-    </div>
-
-    <div class="view-head">
-      <div class="view-title">Projects</div>
-      <div class="view-sub">
-        <b>4</b> tracked · <b>34</b> sessions · updated <b>2h ago</b>
-      </div>
-      <div class="view-actions">
-        <button class="on">sort:cost</button>
-        <button>sort:name</button>
-        <button>sort:recent</button>
-      </div>
-    </div>
-
-    <div class="col-head">
-      <span></span>
-      <span>project</span>
-      <span>share · mtd</span>
-      <span class="num">sessions</span>
-      <span class="num">last run</span>
-      <span class="num">cost · mtd</span>
-    </div>
-
-    <!-- row 1 — DeviceGuardian (open) -->
-    <div class="row open">
-      <span class="caret">▾</span>
-      <span class="name">
-        <span class="label">DeviceGuardian</span>
-        <span class="slug">acme-corp/device-guardian</span>
-      </span>
-      <span class="share-cell">
-        <span class="track"><i style="width: 67.5%;"></i></span>
-        <span class="pct">67.5%</span>
-      </span>
-      <span class="num">14</span>
-      <span class="last">2h ago</span>
-      <span class="cost">$1,713.04</span>
-    </div>
-
-    <!-- expanded panel -->
-    <div class="expanded">
-      <div class="exp-grid">
-        <!-- cost split -->
-        <div class="exp-cell">
-          <div class="exp-h">cost split · $1,713.04</div>
-
-          <div class="split-line cache">
-            <span class="k">cache</span>
-            <span class="pct">91.2%</span>
-            <span class="bar"><i style="width: 91.2%;"></i></span>
-            <span class="v">$1,562.29</span>
-          </div>
-          <div class="split-line output">
-            <span class="k">output</span>
-            <span class="pct">5.1%</span>
-            <span class="bar"><i style="width: 5.1%;"></i></span>
-            <span class="v">$87.36</span>
-          </div>
-          <div class="split-line input">
-            <span class="k">input</span>
-            <span class="pct">3.7%</span>
-            <span class="bar"><i style="width: 3.7%;"></i></span>
-            <span class="v">$63.39</span>
-          </div>
-
-          <div class="split-foot">
-            <span><b>1.4B</b> tokens · cache hit <span class="v">94.6%</span></span>
-            <span class="green">saved ~$16,288 vs uncached</span>
-          </div>
-        </div>
-
-        <!-- top tools -->
-        <div class="exp-cell">
-          <div class="exp-h">top tools · by data volume</div>
-          <div class="tool-line">
-            <span class="idx">01</span>
-            <span class="k">Read</span>
-            <span class="calls">8,914 ×</span>
-            <span class="bytes">412.8 MB</span>
-          </div>
-          <div class="tool-line">
-            <span class="idx">02</span>
-            <span class="k">Edit</span>
-            <span class="calls">2,107 ×</span>
-            <span class="bytes">189.2 MB</span>
-          </div>
-          <div class="tool-line">
-            <span class="idx">03</span>
-            <span class="k">Bash</span>
-            <span class="calls">1,438 ×</span>
-            <span class="bytes">67.4 MB</span>
-          </div>
-          <div class="tool-divider"></div>
-          <div class="tool-line more">
-            <span class="idx"></span>
-            <span class="k">+ 11 more tools</span>
-            <span class="calls">3,802 ×</span>
-            <span class="bytes">98.1 MB</span>
-          </div>
-          <div class="split-foot" style="margin-top: 18px;">
-            <span><b>17.3k</b> total calls</span>
-            <span><b>767.5 MB</b> data moved</span>
-          </div>
-        </div>
-
-        <!-- outcomes -->
-        <div class="exp-cell">
-          <div class="exp-h">outcomes</div>
-          <div class="outcomes-grid">
-            <div class="stat">
-              <div class="stat-v green">12</div>
-              <div class="stat-l">commits</div>
-            </div>
-            <div class="stat">
-              <div class="stat-v green">980<span class="small"> / 994</span></div>
-              <div class="stat-l">tests passed</div>
-            </div>
-            <div class="stat">
-              <div class="stat-v amber">$142.75</div>
-              <div class="stat-l">cost · commit</div>
-            </div>
-            <div class="stat">
-              <div class="stat-v green">3</div>
-              <div class="stat-l">prs merged</div>
-            </div>
-            <div class="stat">
-              <div class="stat-v">184</div>
-              <div class="stat-l">files touched</div>
-            </div>
-            <div class="stat">
-              <div class="stat-v">$1.72</div>
-              <div class="stat-l">cost · test</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="exp-foot">
-        <span>models: <b>sonnet-4.5 · haiku-4.5</b></span>
-        <span>branch: <b>main</b></span>
-        <span>path: <b>~/code/acme-corp/device-guardian</b></span>
-        <div class="actions">
-          <button><kbd>S</kbd>sessions</button>
-          <button><kbd>D</kbd>daily</button>
-          <button><kbd>E</kbd>export</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- row 2 — LocalLLM (stripe) -->
-    <div class="row stripe">
-      <span class="caret">▸</span>
-      <span class="name">
-        <span class="label">LocalLLM</span>
-        <span class="slug">you/local-llm-runner</span>
-      </span>
-      <span class="share-cell">
-        <span class="track"><i style="width: 11%;"></i></span>
-        <span class="pct">11.0%</span>
-      </span>
-      <span class="num">6</span>
-      <span class="last">3d ago</span>
-      <span class="cost">$280.96</span>
-    </div>
-
-    <!-- row 3 — MailSift -->
-    <div class="row">
-      <span class="caret">▸</span>
-      <span class="name">
-        <span class="label">MailSift</span>
-        <span class="slug">you/mailsift</span>
-      </span>
-      <span class="share-cell">
-        <span class="track"><i style="width: 9.5%;"></i></span>
-        <span class="pct">9.5%</span>
-      </span>
-      <span class="num">7</span>
-      <span class="last">2d ago</span>
-      <span class="cost">$242.18</span>
-    </div>
-
-    <!-- row 4 — AgentMeter (stripe) -->
-    <div class="row stripe">
-      <span class="caret">▸</span>
-      <span class="name">
-        <span class="label">AgentMeter</span>
-        <span class="slug">you/agentmeter</span>
-      </span>
-      <span class="share-cell">
-        <span class="track"><i style="width: 7.7%;"></i></span>
-        <span class="pct">7.7%</span>
-      </span>
-      <span class="num">5</span>
-      <span class="last">13h ago</span>
-      <span class="cost">$196.42</span>
-    </div>
-
-    <!-- totals -->
-    <div class="totals">
-      <span></span>
-      <span class="lbl">total · 4 projects + scratch</span>
-      <span></span>
-      <span class="v">34</span>
-      <span class="v">—</span>
-      <span class="v cost">$2,538.00</span>
-    </div>
-
+  <!-- ─────────── content (JS-rendered) ─────────── -->
+  <main class="content" id="content">
+    <div class="loading">Loading project data...</div>
   </main>
+
+  <!-- keep this comment to mark where static content was removed -->
 
   <!-- ─────────── status bar ─────────── -->
   <div class="statusbar">
@@ -760,5 +547,146 @@
   </div>
 
 </div>
+<script>
+// Data source is our own local SQLite via localhost API — no external input.
+// All rendered values come from agentmeter's DB, not user-supplied content.
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let DATA = null;
+let openProject = null;
+
+function fmt(n) { return n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtI(n) { return n.toLocaleString('en-US'); }
+function fmtBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+function fmtTokens(t) {
+  if (t >= 1e9) return (t/1e9).toFixed(1) + 'B';
+  if (t >= 1e6) return (t/1e6).toFixed(1) + 'M';
+  if (t >= 1e3) return (t/1e3).toFixed(1) + 'k';
+  return t.toString();
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.textContent; }
+
+function renderProjects(data) {
+  DATA = data;
+  const main = document.getElementById('content');
+  const ps = data.projects;
+  const parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>projects</b></div>',
+    '<div class="right">',
+    '<div class="field"><span class="k">scope</span><span class="v">month</span></div>',
+    '<div class="field"><span class="k">window</span><span class="v">', esc(data.window.start), ' → ', esc(data.window.end), '</span></div>',
+    '<div class="field"><span class="k">currency</span><span class="v">USD</span></div>',
+    '</div></div>',
+    '<div class="view-head"><div class="view-title">Projects</div>',
+    '<div class="view-sub"><b>', ps.length, '</b> tracked · <b>', data.totalSessions, '</b> sessions</div>',
+    '<div class="view-actions"><button class="on">sort:cost</button><button>sort:name</button><button>sort:recent</button></div></div>',
+    '<div class="col-head"><span></span><span>project</span><span>share · mtd</span>',
+    '<span class="num">sessions</span><span class="num">last run</span><span class="num">cost · mtd</span></div>'
+  );
+
+  ps.forEach(function(p, i) {
+    const isOpen = openProject === p.name;
+    const stripe = (!isOpen && i % 2 === 1) ? ' stripe' : '';
+    const openCls = isOpen ? ' open' : '';
+
+    parts.push(
+      '<div class="row', stripe, openCls, '" data-project="', esc(p.name), '">',
+      '<span class="caret">', isOpen ? '▾' : '▸', '</span>',
+      '<span class="name"><span class="label">', esc(p.name), '</span></span>',
+      '<span class="share-cell"><span class="track"><i style="width:', p.sharePct, '%;"></i></span>',
+      '<span class="pct">', p.sharePct, '%</span></span>',
+      '<span class="num">', p.sessions, '</span>',
+      '<span class="last">', esc(p.lastRun), '</span>',
+      '<span class="cost">$', fmt(p.cost), '</span></div>'
+    );
+
+    if (isOpen) {
+      var cs = p.costSplit;
+      var o = p.outcomes;
+      parts.push(
+        '<div class="expanded"><div class="exp-grid">',
+        '<div class="exp-cell"><div class="exp-h">cost split · $', fmt(p.cost), '</div>',
+        '<div class="split-line cache"><span class="k">cache</span><span class="pct">', cs.cachePct, '%</span>',
+        '<span class="bar"><i style="width:', cs.cachePct, '%;"></i></span><span class="v">$', fmt(cs.cache), '</span></div>',
+        '<div class="split-line output"><span class="k">output</span><span class="pct">', cs.outputPct, '%</span>',
+        '<span class="bar"><i style="width:', cs.outputPct, '%;"></i></span><span class="v">$', fmt(cs.output), '</span></div>',
+        '<div class="split-line input"><span class="k">input</span><span class="pct">', cs.inputPct, '%</span>',
+        '<span class="bar"><i style="width:', cs.inputPct, '%;"></i></span><span class="v">$', fmt(cs.input), '</span></div>',
+        '<div class="split-foot"><span><b>', fmtTokens(p.tokens), '</b> tokens · cache hit <span class="v">', p.cacheHitPct, '%</span></span>',
+        '<span class="green">saved ~$', fmtI(p.savedVsUncached), ' vs uncached</span></div></div>'
+      );
+
+      parts.push('<div class="exp-cell"><div class="exp-h">top tools · by data volume</div>');
+      p.tools.forEach(function(t, j) {
+        parts.push(
+          '<div class="tool-line"><span class="idx">', String(j+1).padStart(2,'0'), '</span>',
+          '<span class="k">', esc(t.name), '</span>',
+          '<span class="calls">', fmtI(t.calls), ' ×</span>',
+          '<span class="bytes">', fmtBytes(t.bytes), '</span></div>'
+        );
+      });
+      if (p.moreTools.count > 0) {
+        parts.push(
+          '<div class="tool-divider"></div>',
+          '<div class="tool-line more"><span class="idx"></span>',
+          '<span class="k">+ ', p.moreTools.count, ' more tools</span>',
+          '<span class="calls">', fmtI(p.moreTools.calls), ' ×</span>',
+          '<span class="bytes">', fmtBytes(p.moreTools.bytes), '</span></div>'
+        );
+      }
+      parts.push(
+        '<div class="split-foot" style="margin-top:18px"><span><b>', fmtTokens(p.totalToolCalls), '</b> total calls</span>',
+        '<span><b>', fmtBytes(p.totalToolBytes), '</b> data moved</span></div></div>'
+      );
+
+      parts.push(
+        '<div class="exp-cell"><div class="exp-h">outcomes</div><div class="outcomes-grid">',
+        '<div class="stat"><div class="stat-v green">', o.commits, '</div><div class="stat-l">commits</div></div>',
+        '<div class="stat"><div class="stat-v green">', fmtI(o.testsPassed),
+        o.testsFailed ? '<span class="small"> / ' + fmtI(o.testsPassed + o.testsFailed) + '</span>' : '',
+        '</div><div class="stat-l">tests passed</div></div>',
+        '<div class="stat"><div class="stat-v amber">', o.costPerCommit ? '$' + fmt(o.costPerCommit) : '—', '</div><div class="stat-l">cost · commit</div></div>',
+        '<div class="stat"><div class="stat-v">', o.filesChanged, '</div><div class="stat-l">files touched</div></div>',
+        '<div class="stat"><div class="stat-v">', o.costPerTest ? '$' + fmt(o.costPerTest) : '—', '</div><div class="stat-l">cost · test</div></div>',
+        '</div></div></div></div></div>'
+      );
+    }
+  });
+
+  parts.push(
+    '<div class="totals"><span></span><span class="lbl">total · ', ps.length, ' projects</span><span></span>',
+    '<span class="v">', data.totalSessions, '</span><span class="v">—</span>',
+    '<span class="v cost">$', fmt(data.totalCost), '</span></div>'
+  );
+
+  main.innerHTML = parts.join(''); // safe: all values from local DB via esc()
+
+  $$('.row[data-project]').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var name = row.dataset.project;
+      openProject = openProject === name ? null : name;
+      renderProjects(DATA);
+    });
+  });
+}
+
+fetch('/api/projects')
+  .then(function(r) { return r.json(); })
+  .then(renderProjects)
+  .catch(function(err) {
+    document.getElementById('content').textContent = 'Error: ' + err.message;
+  });
+
+// Update status bar timestamp
+var ts = document.querySelector('.statusbar .dim');
+if (ts) ts.textContent = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+</script>
 </body>
 </html>

@@ -10,6 +10,7 @@ from agentmeter.cli_advise import advise
 from agentmeter.cli_breaker import breaker
 from agentmeter.cli_budget import budget
 from agentmeter.cli_cost import cost
+from agentmeter.cli_dashboard import dashboard
 from agentmeter.cli_export import export
 from agentmeter.cli_forecast import forecast
 from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
@@ -30,6 +31,7 @@ main.add_command(advise)
 main.add_command(budget)
 main.add_command(breaker)
 main.add_command(cost)
+main.add_command(dashboard)
 main.add_command(export)
 main.add_command(forecast)
 main.add_command(hook)
