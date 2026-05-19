@@ -33,12 +33,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._api_projects()
         elif self.path == "/api/rates":
             self._api_rates()
+        elif self.path == "/api/daily" or self.path.startswith("/api/daily?"):
+            self._api_daily()
         else:
             super().do_GET()
 
     def _api_projects(self):
         """Return project data as JSON."""
         self._json_response(build_projects_data(self.db))
+
+    def _api_daily(self):
+        """Return daily totals with cost as JSON."""
+        self._json_response(build_daily_data(self.db))
 
     def _api_rates(self):
         """Return rate card as JSON."""
@@ -242,6 +248,47 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
             "start": (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d"),
             "end": datetime.now().strftime("%Y-%m-%d"),
         },
+    }
+
+
+def build_daily_data(db: MeterDB, days: int = 14) -> dict:
+    """Build daily totals with cost from real token data."""
+    totals = db.get_daily_totals(days=days)
+    sessions = db.get_sessions(limit=500)
+
+    # Build daily cost map
+    daily_costs: dict[str, float] = {}
+    daily_sessions: dict[str, int] = {}
+    for session in sessions:
+        jsonl_path = find_session_jsonl(
+            session.id, session.server_command,
+        )
+        if not jsonl_path:
+            continue
+        tokens = read_session_tokens_from_file(jsonl_path)
+        if not tokens or tokens.llm_call_count == 0:
+            continue
+        rate = db.get_rate(tokens.model_id)
+        if not rate:
+            continue
+        cost_data = calculate_session_cost(tokens, rate)
+        day = session.started_at[:10]
+        daily_costs[day] = daily_costs.get(day, 0) + cost_data.total_cost
+        daily_sessions[day] = daily_sessions.get(day, 0) + 1
+
+    rows = []
+    for t in totals:
+        rows.append({
+            "day": t.day,
+            "calls": t.call_count,
+            "errors": t.error_count,
+            "cost": round(daily_costs.get(t.day, 0), 2),
+            "sessions": daily_sessions.get(t.day, 0),
+        })
+
+    return {
+        "days": rows,
+        "totalCost": round(sum(daily_costs.values()), 2),
     }
 
 

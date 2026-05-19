@@ -708,6 +708,48 @@ function renderRates(rates) {
   main.innerHTML = parts.join('');
 }
 
+// ─── Daily view ───
+function renderDaily(data) {
+  var main = document.getElementById('content');
+  var rows = data.days;
+  var maxCost = Math.max.apply(null, rows.map(function(r) { return r.cost; })) || 1;
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>daily</b></div>',
+    '<div class="right"><div class="field"><span class="k">range</span><span class="v">last ', rows.length, ' days</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Daily</div>',
+    '<div class="view-sub">total <b>$', fmt(data.totalCost), '</b></div></div>',
+    '<div class="col-head" style="grid-template-columns: 100px 100px 100px 1fr;">',
+    '<span>day</span><span class="num">cost</span><span class="num">sessions</span><span></span></div>'
+  );
+
+  rows.forEach(function(r, i) {
+    var barW = maxCost > 0 ? (r.cost / maxCost * 100) : 0;
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 100px 100px 100px 1fr; cursor: default;">',
+      '<span class="dim">', esc(r.day), '</span>',
+      '<span class="num amber">$', fmt(r.cost), '</span>',
+      '<span class="num">', r.sessions, '</span>',
+      '<span style="display:flex;align-items:center;gap:12px;">',
+      '<span class="track" style="flex:1;height:6px;background:var(--fg-ghost);position:relative;">',
+      '<i style="position:absolute;inset:0 auto 0 0;background:var(--amber);width:', barW.toFixed(1), '%;"></i></span>',
+      '<span class="muted" style="font-size:12px;min-width:50px">', fmtI(r.calls), ' calls</span>',
+      '</span></div>'
+    );
+  });
+
+  parts.push(
+    '<div class="totals" style="grid-template-columns: 100px 100px 100px 1fr;">',
+    '<span class="lbl">total</span>',
+    '<span class="v cost">$', fmt(data.totalCost), '</span>',
+    '<span></span><span></span></div>'
+  );
+
+  main.innerHTML = parts.join('');
+}
+
 // ─── View routing ───
 var currentView = 'projects';
 
@@ -729,6 +771,9 @@ function switchView(view) {
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else if (view === 'rates') {
     fetch('/api/rates').then(function(r) { return r.json(); }).then(renderRates)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'daily') {
+    fetch('/api/daily').then(function(r) { return r.json(); }).then(renderDaily)
       .catch(function(e) { main.textContent = 'Error: ' + e.message; });
   } else {
     main.innerHTML = '<div class="loading">View "' + esc(view) + '" — coming soon</div>';
