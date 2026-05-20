@@ -33,5 +33,5 @@ src/agentmeter/cli_export.py
 src/agentmeter/cli_dashboard.py
 src/agentmeter/session_reader.py
 src/agentmeter/web/
-tests/test_session_reader.py
-tests/TEST_STRATEGY.md
+tests/
+.github/

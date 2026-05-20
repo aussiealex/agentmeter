@@ -216,15 +216,6 @@ Contact: [coming soon]
 - Python 3.11+
 - No external services or API keys
 
-## Developing
-
-```bash
-git clone https://github.com/your-org/agentmeter
-cd agentmeter
-pip install -e ".[dev]"
-python3 -m pytest tests/ -v
-```
-
 ## Licence
 
 Apache 2.0 — see [LICENSE](LICENSE).
