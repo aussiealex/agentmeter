@@ -139,6 +139,36 @@ agentmeter breaker set 20 60     # trip after 20 calls in 60 seconds
 agentmeter breaker set 10 30 -c 600  # custom cooldown (600s)
 ```
 
+### MCP Proxy
+
+If you run MCP servers, AgentMeter can sit between your agent and the server
+as a transparent proxy — metering every MCP tool call without changing either
+side:
+
+```bash
+# Instead of running the server directly:
+#   python -m mailsift.mcp.server
+# Wrap it:
+agentmeter wrap python -m mailsift.mcp.server
+agentmeter wrap --name mailsift python -m mailsift.mcp.server
+```
+
+In your agent's `.mcp.json`, just prefix the command:
+
+```json
+{
+  "mcpServers": {
+    "mailsift": {
+      "command": "agentmeter",
+      "args": ["wrap", "--name", "mailsift", "python", "-m", "mailsift.mcp.server"]
+    }
+  }
+}
+```
+
+Hook data and proxy data feed the same database, so you get a complete
+picture — built-in tools and MCP tools in one dashboard.
+
 ### Data Export
 
 ```bash
