@@ -1,9 +1,24 @@
-.handoff.md
+# Python
 __pycache__/
 *.pyc
 .venv/
 *.egg-info/
 dist/
 build/
-*.db
 .ruff_cache/
+.pytest_cache/
+
+# AgentMeter data
+*.db
+
+# Private / internal
+.handoff.md
+.specify/
+.claude/
+CLAUDE.md
+specs/
+designs/
+dashboard/
+reports/
+PROJECT_BRIEF.md
+wrap-mailsift.sh
