@@ -172,8 +172,6 @@ the advanced path for metering MCP server traffic.
 - **Cross-platform** — Linux, macOS, Windows
 - **Fast hooks** — <5ms overhead, stdlib only, never crashes the agent
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
-
 ## Supported Agents
 
 | Agent | Hook Type | Status |
