@@ -22,3 +22,14 @@ dashboard/
 reports/
 PROJECT_BRIEF.md
 wrap-mailsift.sh
+
+# Pro features (kept private)
+src/agentmeter/cli_cost.py
+src/agentmeter/cli_forecast.py
+src/agentmeter/cli_advise.py
+src/agentmeter/cli_strategy.py
+src/agentmeter/cli_summary.py
+src/agentmeter/cli_export.py
+src/agentmeter/cli_dashboard.py
+src/agentmeter/session_reader.py
+src/agentmeter/web/

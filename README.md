@@ -3,9 +3,8 @@
 **Know what your agents cost.**
 
 AgentMeter is the universal metering layer for AI coding agents. It captures
-every tool call and API interaction — whether through agent hooks or an MCP
-proxy — and gives you real cost attribution, spend forecasting, and budget
-enforcement.
+every tool call — whether through agent hooks or an MCP proxy — and gives you
+tool call analytics, budget enforcement, and cost visibility.
 
 Works with **Claude Code**, **Gemini CLI**, **Codex CLI**, **Copilot CLI**,
 and any MCP-compatible agent. Runs entirely on your machine. No cloud, no
@@ -15,16 +14,11 @@ accounts, no signup.
 
 AI coding agents are powerful, but they're expensive and opaque. A single
 session can burn through $50+ in API costs, and you won't know until the
-bill arrives. Costs scale quadratically — every turn replays the entire
-conversation as input.
+bill arrives.
 
 AgentMeter sits at the tool boundary (what agents *do*, not what they
-*think*) and answers:
-
-- How much did that session cost?
-- Which project is eating my budget?
-- Should I split this session or keep going?
-- Am I on track for my monthly spend target?
+*think*) and gives you visibility into every tool call, every session,
+every project.
 
 ## Quick Start
 
@@ -52,46 +46,14 @@ agentmeter hook install copilot
 Just code. AgentMeter records every tool call in the background with <5ms
 overhead.
 
-### 3. See what it cost
-
-```
-$ agentmeter daily
-
-  Daily Totals (last 7 days)
-  ──────────────────────────────────────────────────────
-  2026-05-14  ███████████          383 calls  $  277.23
-  2026-05-15  █████████████████    718 calls
-  2026-05-16  █████████████████    847 calls  $  320.07
-  2026-05-17  ██████████████████   773 calls  $  167.04
-  2026-05-18  █████████████████    742 calls  $  288.81
-  2026-05-19  ██████████           340 calls  $  242.24
-  2026-05-20  ████████████         419 calls  $   97.66
-```
-
-## Features
-
-### Cost Analysis (real token data)
-
-AgentMeter reads your agent's actual API usage from its session transcripts
-— no estimates, no approximations.
-
-```
-$ agentmeter cost
-
-  AgentMeter  —  $21.39  (7,783,047 tokens, 146 LLM calls)
-  ──────────────────────────────────────────────────────────
-    Cache reads:        7,272,977  (93%)
-    Cache creation:       463,809  (6%)
-    Output:                18,230  (0.2%)
-    Input:                 28,031  (0.4%)
-```
-
-### Tool Call Stats
+### 3. See what happened
 
 ```
 $ agentmeter stats
 
-  Total: 847 calls | 3 errors | 142ms avg tool time
+  AgentMeter Stats (today)
+  ────────────────────────────────────────────────────────────
+  Total: 847 calls | 3 errors | 142ms tool time
 
   Read                 ████████████████████   312 calls
   Edit                 ████████████           198 calls
@@ -99,23 +61,34 @@ $ agentmeter stats
   Grep                 ██████                  89 calls
 ```
 
-### Web Dashboard
+```
+$ agentmeter daily
 
-```bash
-agentmeter dashboard
+  Daily Totals (last 7 days)
+  ──────────────────────────────────────────────────────
+  2026-05-14  ███████████          383 calls
+  2026-05-15  █████████████████    718 calls
+  2026-05-16  █████████████████    847 calls
+  2026-05-17  ██████████████████   773 calls
+  2026-05-18  █████████████████    742 calls
+  2026-05-19  ██████████           340 calls
+  2026-05-20  ████████████         419 calls
 ```
 
-Opens a local dashboard at `localhost:8070` with six views: overview KPIs,
-project breakdown, session list, daily charts, strategy recommendations,
-and rate card management.
+## Features
 
-### Spend Forecasting
+### Tool Call Stats
+
+Track every tool call across all your agents and projects:
 
 ```bash
-agentmeter forecast    # projected monthly spend
-agentmeter advise      # spend analysis with recommendations
-agentmeter strategy    # per-project cost analysis and advice
-agentmeter summary     # compact cost context (for agent injection)
+agentmeter stats              # today's stats
+agentmeter stats --week       # this week
+agentmeter stats --all        # all time
+agentmeter calls              # recent individual calls
+agentmeter calls --tool Bash  # filter by tool name
+agentmeter sessions           # session breakdowns with outcomes
+agentmeter daily              # daily totals with bar chart
 ```
 
 ### Budget Enforcement
@@ -128,6 +101,7 @@ agentmeter budget set session 50          # max 50 calls per session
 agentmeter budget set daily 200           # max 200 calls per day
 agentmeter budget set daily 100 -s mail   # per-server daily limit
 agentmeter budget set session 30 -a warn  # warn but don't block
+agentmeter budget show                    # list all rules
 ```
 
 ### Circuit Breakers
@@ -146,11 +120,8 @@ as a transparent proxy — metering every MCP tool call without changing either
 side:
 
 ```bash
-# Instead of running the server directly:
-#   python -m mailsift.mcp.server
-# Wrap it:
-agentmeter wrap python -m mailsift.mcp.server
-agentmeter wrap --name mailsift python -m mailsift.mcp.server
+agentmeter wrap python -m some.mcp.server
+agentmeter wrap --name myserver python -m some.mcp.server
 ```
 
 In your agent's `.mcp.json`, just prefix the command:
@@ -158,22 +129,24 @@ In your agent's `.mcp.json`, just prefix the command:
 ```json
 {
   "mcpServers": {
-    "mailsift": {
+    "myserver": {
       "command": "agentmeter",
-      "args": ["wrap", "--name", "mailsift", "python", "-m", "mailsift.mcp.server"]
+      "args": ["wrap", "--name", "myserver", "python", "-m", "some.mcp.server"]
     }
   }
 }
 ```
 
-Hook data and proxy data feed the same database, so you get a complete
-picture — built-in tools and MCP tools in one dashboard.
+Hook data and proxy data feed the same database — built-in tools and MCP
+tools in one view.
 
-### Data Export
+### Rate Card
+
+View and customise per-model pricing for cost estimation:
 
 ```bash
-agentmeter export                          # JSONL to stdout
-agentmeter export --tool Read --since 2026-05-01 --limit 100
+agentmeter rates              # view all rates
+agentmeter rates set <model>  # edit a model's rates
 ```
 
 ## How It Works
@@ -191,9 +164,6 @@ Path 2: MCP Proxy (for metering MCP server traffic)
 The hook path is the primary product. It captures built-in tool calls (Read,
 Edit, Bash, etc.) with zero config changes to your agent. The MCP proxy is
 the advanced path for metering MCP server traffic.
-
-Cost data comes from reading the agent's own session transcript files, which
-contain real token counts from the API response.
 
 ### Architecture
 
@@ -213,6 +183,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
 | Codex CLI | PostToolUse | Full support |
 | Copilot CLI | postToolUse | Full support |
 
+## AgentMeter Pro
+
+For teams and power users who need deeper cost intelligence:
+
+- **Real token cost analysis** — actual API costs from session transcripts
+- **Web dashboard** — visual overview of spend across projects and sessions
+- **Spend forecasting** — projected monthly costs based on usage patterns
+- **Strategy recommendations** — actionable advice to reduce agent spend
+- **Data export** — JSONL export for external analysis
+
+Contact: [coming soon]
+
 ## CLI Reference
 
 | Command | Description |
@@ -221,18 +203,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
 | `agentmeter calls` | Recent individual calls |
 | `agentmeter sessions` | Session breakdowns with outcomes |
 | `agentmeter daily` | Daily totals with bar chart |
-| `agentmeter cost` | Real token cost per session |
-| `agentmeter forecast` | Monthly spend projection |
-| `agentmeter advise` | Spend analysis + recommendations |
-| `agentmeter strategy` | Per-project cost analysis |
-| `agentmeter summary` | Compact cost context for agents |
-| `agentmeter dashboard` | Web dashboard (localhost:8070) |
-| `agentmeter export` | JSONL data export |
 | `agentmeter budget` | Budget rules (set/show/clear) |
 | `agentmeter breaker` | Circuit breakers (set/show/clear) |
 | `agentmeter hook` | Hook management (install/status) |
 | `agentmeter rates` | View/edit rate card |
 | `agentmeter wrap` | MCP proxy mode |
+| `agentmeter rename` | Rename a session |
 | `agentmeter backfill` | Detect outcomes in historical sessions |
 
 ## Requirements

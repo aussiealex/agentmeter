@@ -6,18 +6,11 @@ from datetime import datetime, timedelta
 
 import click
 
-from agentmeter.cli_advise import advise
 from agentmeter.cli_breaker import breaker
 from agentmeter.cli_budget import budget
-from agentmeter.cli_cost import cost
-from agentmeter.cli_dashboard import dashboard
-from agentmeter.cli_export import export
-from agentmeter.cli_forecast import forecast
 from agentmeter.cli_format import format_ms, print_distribution, print_tool_table
 from agentmeter.cli_hook import hook
 from agentmeter.cli_rates import rates
-from agentmeter.cli_strategy import strategy
-from agentmeter.cli_summary import summary
 from agentmeter.db import MeterDB
 
 
@@ -27,17 +20,35 @@ def main() -> None:
     """AgentMeter — meter every MCP tool call."""
 
 
-main.add_command(advise)
 main.add_command(budget)
 main.add_command(breaker)
-main.add_command(cost)
-main.add_command(dashboard)
-main.add_command(export)
-main.add_command(forecast)
 main.add_command(hook)
 main.add_command(rates)
-main.add_command(strategy)
-main.add_command(summary)
+
+
+def _load_pro_commands() -> None:
+    """Register pro commands if agentmeter-pro is installed."""
+    try:
+        from agentmeter.cli_advise import advise
+        from agentmeter.cli_cost import cost
+        from agentmeter.cli_dashboard import dashboard
+        from agentmeter.cli_export import export
+        from agentmeter.cli_forecast import forecast
+        from agentmeter.cli_strategy import strategy
+        from agentmeter.cli_summary import summary
+
+        main.add_command(advise)
+        main.add_command(cost)
+        main.add_command(dashboard)
+        main.add_command(export)
+        main.add_command(forecast)
+        main.add_command(strategy)
+        main.add_command(summary)
+    except ImportError:
+        pass
+
+
+_load_pro_commands()
 
 
 @main.command(context_settings={"ignore_unknown_options": True})
@@ -185,12 +196,6 @@ def backfill() -> None:
 @click.option("--days", "-d", default=7, help="Number of days to show.")
 def daily(days: int) -> None:
     """Show daily call totals with cost when available."""
-    from agentmeter.session_reader import (
-        calculate_session_cost,
-        find_session_jsonl,
-        read_session_tokens_from_file,
-    )
-
     db = MeterDB()
     totals = db.get_daily_totals(days=days)
 
@@ -199,22 +204,31 @@ def daily(days: int) -> None:
         db.close()
         return
 
-    # Build daily cost map from real token data
+    # Build daily cost map from real token data (pro feature)
     daily_costs: dict[str, float] = {}
-    sessions = db.get_sessions(limit=200)
-    for session in sessions:
-        jsonl_path = find_session_jsonl(session.id, session.server_command)
-        if not jsonl_path:
-            continue
-        tokens = read_session_tokens_from_file(jsonl_path)
-        if not tokens or tokens.llm_call_count == 0:
-            continue
-        rate = db.get_rate(tokens.model_id)
-        if not rate:
-            continue
-        cost_data = calculate_session_cost(tokens, rate)
-        day = session.started_at[:10]
-        daily_costs[day] = daily_costs.get(day, 0) + cost_data.total_cost
+    try:
+        from agentmeter.session_reader import (
+            calculate_session_cost,
+            find_session_jsonl,
+            read_session_tokens_from_file,
+        )
+
+        sessions = db.get_sessions(limit=200)
+        for session in sessions:
+            jsonl_path = find_session_jsonl(session.id, session.server_command)
+            if not jsonl_path:
+                continue
+            tokens = read_session_tokens_from_file(jsonl_path)
+            if not tokens or tokens.llm_call_count == 0:
+                continue
+            rate = db.get_rate(tokens.model_id)
+            if not rate:
+                continue
+            cost_data = calculate_session_cost(tokens, rate)
+            day = session.started_at[:10]
+            daily_costs[day] = daily_costs.get(day, 0) + cost_data.total_cost
+    except ImportError:
+        pass
 
     has_costs = bool(daily_costs)
 
