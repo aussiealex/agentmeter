@@ -8,6 +8,7 @@ import click
 
 from agentmeter.db import MeterDB
 from agentmeter.models import SessionCost, SessionTokens, ToolStats
+from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
     find_session_jsonl,
@@ -192,9 +193,7 @@ def strategy(days: int) -> None:
     for session in sessions:
         if session.started_at < since:
             continue
-        project = session.server_command.rstrip("/").rsplit(
-            "/", 1,
-        )[-1]
+        project = project_name(session.server_command)
         if project in proj_map:
             pd = proj_map[project]
             pd.commits += session.commits

@@ -28,6 +28,7 @@ from agentmeter.models import (
     ToolCall,
     ToolStats,
 )
+from agentmeter.platform import data_dir
 
 
 def _default_db_path() -> Path:
@@ -35,7 +36,7 @@ def _default_db_path() -> Path:
     env_path = os.environ.get("AGENTMETER_DB")
     if env_path:
         return Path(env_path)
-    return Path.home() / ".local" / "share" / "agentmeter" / "agentmeter.db"
+    return data_dir() / "agentmeter.db"
 
 
 class MeterDB:

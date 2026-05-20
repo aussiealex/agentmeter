@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import click
 
 from agentmeter.db import MeterDB
+from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
     find_session_jsonl,
@@ -44,7 +45,7 @@ def summary(days: int, project: str | None) -> None:
     for s in sessions:
         if s.started_at < since:
             continue
-        proj = s.server_command.rstrip("/").rsplit("/", 1)[-1]
+        proj = project_name(s.server_command)
         if project and proj != project:
             continue
 

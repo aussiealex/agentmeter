@@ -117,13 +117,17 @@ def calculate_session_cost(
 def derive_project_slug(project_dir: str) -> str:
     """Derive Claude Code's project slug from a directory path.
 
-    Claude Code converts absolute paths to slugs by replacing / with -:
+    Claude Code converts absolute paths to slugs by replacing path
+    separators with -:
         /media/aa/LargeBackup/MainApps/AgentMeter
         → -media-aa-LargeBackup-MainApps-AgentMeter
+
+    On Windows, backslashes are normalised to forward slashes first,
+    matching Claude Code's own slug derivation.
     """
     if not project_dir or project_dir == "/":
         return ""
-    return project_dir.replace("/", "-")
+    return project_dir.replace("\\", "/").replace("/", "-")
 
 
 def find_session_jsonl(

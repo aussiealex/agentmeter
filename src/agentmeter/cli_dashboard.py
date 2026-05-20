@@ -12,6 +12,7 @@ from pathlib import Path
 import click
 
 from agentmeter.db import MeterDB
+from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
     find_session_jsonl,
@@ -110,7 +111,7 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
     project_sessions: dict[str, list] = {}
     for s in sessions:
         cmd = s.server_command or ""
-        proj = cmd.rstrip("/").rsplit("/", 1)[-1] if cmd else ""
+        proj = project_name(cmd)
         if not proj:
             continue
         project_sessions.setdefault(proj, []).append(s)
@@ -464,7 +465,7 @@ def build_sessions_data(db: MeterDB) -> dict:
     rows = []
     for s in sessions:
         cmd = s.server_command or ""
-        project = cmd.rstrip("/").rsplit("/", 1)[-1] if cmd else ""
+        project = project_name(cmd)
 
         # Real cost
         cost_val = 0.0

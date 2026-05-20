@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from agentmeter.db import MeterDB
+from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
     find_session_jsonl,
@@ -87,10 +88,10 @@ def _show_session_cost(db: MeterDB, session_id: str) -> None:
             break
 
     # Display
-    project = session.server_command.rstrip("/").rsplit("/", 1)[-1]
+    proj = project_name(session.server_command)
     click.echo()
     click.echo(f"  Session: {session.name or session.id}")
-    click.echo(f"  Project: {project}")
+    click.echo(f"  Project: {proj}")
     click.echo(f"  Model:   {tokens.model_id}")
     click.echo(f"  Started: {session.started_at}")
     click.echo(f"  LLM calls: {tokens.llm_call_count}")
@@ -161,9 +162,7 @@ def _show_recent_costs(db: MeterDB, limit: int) -> None:
             continue
 
         cost_data = calculate_session_cost(tokens, rate)
-        project = session.server_command.rstrip("/").rsplit(
-            "/", 1,
-        )[-1]
+        project = project_name(session.server_command)
         total_tokens = (
             tokens.input_tokens + tokens.cache_creation_tokens
             + tokens.cache_read_tokens + tokens.output_tokens

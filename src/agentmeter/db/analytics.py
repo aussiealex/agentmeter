@@ -14,6 +14,7 @@ from agentmeter.models import (
     SessionStats,
     ToolStats,
 )
+from agentmeter.platform import project_name
 
 
 def get_session_stats(
@@ -77,7 +78,7 @@ def get_session_stats(
         if not display_name:
             cmd = s["server_command"] or ""
             if cmd and "/" in cmd:
-                display_name = cmd.rstrip("/").rsplit("/", 1)[-1]
+                display_name = project_name(cmd)
         if not display_name:
             display_name = s["id"]
 

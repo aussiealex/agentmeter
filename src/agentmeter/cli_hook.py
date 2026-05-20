@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json as _json
 import shutil
+import sys
 
 import click
 
@@ -63,7 +64,7 @@ def hook_install(agent: str) -> None:
         agentmeter hook install copilot
     """
     cfg = _AGENT_CONFIG[agent]
-    python_path = shutil.which("python3") or "python3"
+    python_path = shutil.which("python3") or shutil.which("python") or sys.executable
     command = f"{python_path} -m {cfg['module']}"
 
     if cfg["format"] == "json":

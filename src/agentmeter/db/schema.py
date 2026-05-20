@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from agentmeter.platform import project_name as _project_name
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS session (
     id              TEXT PRIMARY KEY,
@@ -170,7 +172,7 @@ def _backfill_project(conn: sqlite3.Connection) -> None:
 
     for r in rows:
         path = r["server_command"].rstrip("/")
-        project = path.rsplit("/", 1)[-1] if "/" in path else path
+        project = _project_name(path)
         if project:
             conn.execute(
                 "UPDATE tool_call SET project = ? WHERE id = ?",

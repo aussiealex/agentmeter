@@ -8,6 +8,7 @@ import click
 
 from agentmeter.db import MeterDB
 from agentmeter.models import SessionTokens
+from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
     find_session_jsonl,
@@ -62,7 +63,7 @@ def advise(days: int) -> None:
             continue
 
         cost_data = calculate_session_cost(tokens, rate)
-        project = session.server_command.rstrip("/").rsplit("/", 1)[-1]
+        project = project_name(session.server_command)
 
         # Get tool call count for this session
         stats = db.get_session_stats(limit=200)
