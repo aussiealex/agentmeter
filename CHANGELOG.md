@@ -5,7 +5,38 @@ All notable changes to AgentMeter are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/). Versions
 use [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Multi-Agent Foundation
+## [Unreleased]
+
+### Added
+- **Web dashboard** — `agentmeter dashboard` serves a local dashboard at
+  localhost:8070 with six views: overview KPIs, project breakdown, session
+  list, daily charts, strategy recommendations, and rate card management.
+  Single HTML + vanilla JS, no build step.
+- **Cross-platform support** — platform-aware data directory (Linux, macOS,
+  Windows), pathlib-based path handling throughout. Auto-detects OS at runtime.
+- **Real token cost analysis** — `agentmeter cost` reads actual API token
+  counts from Claude Code session transcripts. No estimates.
+- **Spend forecasting** — `agentmeter forecast` projects monthly spend from
+  recent data.
+- **Spend advisory** — `agentmeter advise` analyses spending patterns and
+  generates recommendations.
+- **Strategy command** — `agentmeter strategy` gives per-project cost analysis
+  with actionable advice.
+- **Summary command** — `agentmeter summary` produces compact cost context
+  suitable for agent injection.
+- **Session outcomes** — tracks commits, files changed, and test results
+  per session via Bash call analysis.
+- **Data export** — `agentmeter export` outputs tool call data as JSONL.
+- **Cache write rate** — `cache_write_per_mtok` column on rate card. Anthropic
+  charges 1.25x input rate for cache writes; other providers charge 1.0x.
+- **README.md** — full documentation with install, quick start, features,
+  CLI reference, and architecture overview.
+
+### Changed
+- **Licence field** in pyproject.toml corrected from MIT to Apache-2.0
+  (matching the actual LICENSE file).
+
+## [0.4.0] — Multi-Agent Foundation
 
 ### Added
 - **Multi-agent hook system** — adapters for Claude Code, Gemini CLI, Codex CLI,
