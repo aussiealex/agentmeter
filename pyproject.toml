@@ -21,6 +21,21 @@ agentmeter = "agentmeter.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentmeter"]
 
+[tool.hatch.build.targets.wheel.force-include]
+
+[tool.hatch.build]
+exclude = [
+    "src/agentmeter/cli_cost.py",
+    "src/agentmeter/cli_forecast.py",
+    "src/agentmeter/cli_advise.py",
+    "src/agentmeter/cli_strategy.py",
+    "src/agentmeter/cli_summary.py",
+    "src/agentmeter/cli_export.py",
+    "src/agentmeter/cli_dashboard.py",
+    "src/agentmeter/session_reader.py",
+    "src/agentmeter/web/",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
