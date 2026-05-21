@@ -23,7 +23,7 @@ every project.
 ## Quick Start
 
 ```bash
-pip install agentmeter
+pip install agent-usage
 ```
 
 ### 1. Install the hook (30 seconds)

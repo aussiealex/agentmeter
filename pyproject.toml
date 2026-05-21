@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentmeter"
+name = "agent-usage"
 version = "0.1.0"
 description = "The missing economics layer for MCP agents. Meter every tool call."
 readme = "README.md"
