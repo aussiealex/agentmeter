@@ -33,6 +33,7 @@ src/agentmeter/cli_summary.py
 src/agentmeter/cli_export.py
 src/agentmeter/cli_dashboard.py
 src/agentmeter/session_reader.py
+src/agentmeter/heuristics.py
 src/agentmeter/web/
 tests/
 .github/
