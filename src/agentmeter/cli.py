@@ -30,6 +30,7 @@ def _load_pro_commands() -> None:
     """Register pro commands if agentmeter-pro is installed."""
     try:
         from agentmeter.cli_advise import advise
+        from agentmeter.cli_coach import coach
         from agentmeter.cli_cost import cost
         from agentmeter.cli_dashboard import dashboard
         from agentmeter.cli_export import export
@@ -38,6 +39,7 @@ def _load_pro_commands() -> None:
         from agentmeter.cli_summary import summary
 
         main.add_command(advise)
+        main.add_command(coach)
         main.add_command(cost)
         main.add_command(dashboard)
         main.add_command(export)
