@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>agentmeter · projects</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:         #1e2028;
+    --sidebar:    #171920;
+    --bg-stripe:  #22242e;
+    --bg-hover:   #262834;
+    --bg-active:  #2a2d3a;
+
+    --rule:       #2c2f3a;
+    --rule-2:     #25272f;
+    --rule-3:     #1f2129;
+
+    --fg:         #e8e8ec;
+    --fg-dim:     #c5c7d0;
+    --fg-mute:    #a0a4b0;
+    --fg-faint:   #5e6270;
+    --fg-ghost:   #393b46;
+
+    --amber:      #f0a030;
+    --amber-soft: #c98a36;
+    --amber-low:  #6b5638;
+
+    --green:      #4aba6a;
+    --green-dim:  #2f6b3f;
+
+    --red:        #d45555;
+    --red-dim:    #6c2b2b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); }
+  body {
+    color: var(--fg);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    font-feature-settings: "ss01", "ss02", "calt", "zero";
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+  ::selection { background: var(--amber-low); color: var(--fg); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--fg-ghost); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-faint); }
+
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+    grid-template-rows: 1fr 28px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ─────────── sidebar ─────────── */
+  aside.sidebar {
+    grid-row: 1 / 3;
+    background: var(--sidebar);
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    padding: 22px 20px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand .mark {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+  .brand .mark .dot { color: var(--amber); }
+  .brand .ver {
+    font-size: 12px;
+    color: var(--fg-faint);
+    margin-left: auto;
+  }
+
+  .nav-section { padding: 16px 0 0; }
+  .nav-label {
+    padding: 0 20px 8px;
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .nav-item {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 20px;
+    color: var(--fg-mute);
+    width: 100%;
+    text-align: left;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .nav-item:hover {
+    color: var(--fg);
+    background: var(--bg-hover);
+  }
+  .nav-item.active {
+    color: var(--fg);
+    background: var(--bg-active);
+    border-left-color: var(--amber);
+  }
+  .nav-item.active .nav-key { color: var(--amber); }
+  .nav-item .nav-key {
+    color: var(--fg-faint);
+    font-size: 12px;
+  }
+  .nav-item .nav-name { font-size: 14px; }
+
+  /* sessions badge */
+  .badge {
+    font-size: 11px;
+    color: var(--fg-mute);
+    background: var(--bg-stripe);
+    border: 1px solid var(--rule);
+    padding: 1px 7px;
+    line-height: 1.5;
+  }
+  .nav-item.active .badge {
+    color: var(--amber);
+    border-color: var(--amber-low);
+    background: rgba(240, 160, 48, 0.08);
+  }
+
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 18px 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--fg-mute);
+  }
+  .sidebar-foot .k { color: var(--fg-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+  .sidebar-foot .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .sidebar-foot .v { color: var(--fg-dim); }
+  .sidebar-foot .v.cost { color: var(--amber); }
+  .sidebar-foot .progress {
+    height: 4px;
+    background: var(--bg-stripe);
+    margin-top: 6px;
+    position: relative;
+  }
+  .sidebar-foot .progress i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--amber);
+    width: 50.8%;
+  }
+  .sidebar-foot .pct {
+    font-size: 11px;
+    color: var(--fg-faint);
+    margin-top: 4px;
+  }
+
+  /* ─────────── content ─────────── */
+  main.content {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 18px 28px 16px;
+    border-bottom: 1px solid var(--rule);
+    gap: 28px;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .crumb { color: var(--fg-mute); font-size: 13px; }
+  .crumb b { color: var(--fg); font-weight: 500; }
+  .crumb .sep { color: var(--fg-faint); margin: 0 8px; }
+  .topbar .right { margin-left: auto; display: flex; gap: 24px; align-items: center; }
+  .topbar .right .field { display: flex; gap: 8px; align-items: center; }
+  .topbar .right .field .k { color: var(--fg-faint); }
+  .topbar .right .field .v { color: var(--fg-dim); }
+
+  .view-head {
+    padding: 26px 28px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .view-title {
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .view-sub { color: var(--fg-mute); font-size: 13px; }
+  .view-sub b { color: var(--fg-dim); font-weight: 400; }
+  .view-actions { margin-left: auto; display: flex; gap: 18px; font-size: 13px; color: var(--fg-mute); }
+  .view-actions button:hover { color: var(--fg); }
+  .view-actions .on { color: var(--amber); }
+
+  /* ─────────── table ─────────── */
+  .col-head {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 12px 28px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--fg-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    background: var(--sidebar);
+  }
+  .col-head .num { text-align: right; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 16px 28px;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rule-3);
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .row.stripe { background: var(--bg-stripe); }
+  .row:hover { background: var(--bg-hover); }
+  .row.open { background: var(--bg-active); border-bottom-color: transparent; }
+  .row .caret { color: var(--fg-faint); font-size: 12px; }
+  .row.open .caret { color: var(--amber); }
+  .row .name {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .row .name .label { color: var(--fg); font-weight: 500; font-size: 15px; }
+  .row .name .slug { color: var(--fg-mute); font-size: 12px; }
+  .row .num { text-align: right; color: var(--fg-dim); }
+  .row .cost { text-align: right; color: var(--amber); font-weight: 500; font-size: 15px; }
+  .row .last { text-align: right; color: var(--fg-mute); font-size: 13px; }
+
+  /* share cell with mini bar */
+  .row .share-cell {
+    display: grid;
+    grid-template-columns: 1fr 56px;
+    gap: 10px;
+    align-items: center;
+  }
+  .row .share-cell .track {
+    height: 4px;
+    background: var(--fg-ghost);
+    position: relative;
+  }
+  .row .share-cell .track i {
+    position: absolute; inset: 0 auto 0 0;
+    background: var(--amber);
+  }
+  .row .share-cell .pct {
+    text-align: right;
+    color: var(--fg-dim);
+    font-size: 13px;
+  }
+
+  /* ─────────── expanded panel ─────────── */
+  .expanded {
+    background: var(--bg-active);
+    border-bottom: 1px solid var(--rule);
+    padding: 8px 28px 28px;
+  }
+  .exp-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    margin-top: 4px;
+  }
+  .exp-cell {
+    padding: 22px 26px 22px 0;
+    border-right: 1px solid var(--rule);
+  }
+  .exp-cell:last-child { border-right: 0; padding-right: 0; }
+  .exp-cell + .exp-cell { padding-left: 26px; }
+  .exp-h {
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-bottom: 14px;
+  }
+
+  /* cost split lines */
+  .split-line {
+    display: grid;
+    grid-template-columns: 68px 60px 1fr 90px;
+    gap: 12px;
+    padding: 5px 0;
+    align-items: center;
+    font-size: 14px;
+  }
+  .split-line .k { color: var(--fg-dim); }
+  .split-line .pct { color: var(--fg-mute); text-align: right; }
+  .split-line .bar { height: 6px; background: var(--fg-ghost); position: relative; }
+  .split-line .bar i { position: absolute; inset: 0 auto 0 0; }
+  .split-line.cache  .bar i { background: var(--amber); }
+  .split-line.output .bar i { background: var(--amber-soft); }
+  .split-line.input  .bar i { background: var(--fg-faint); }
+  .split-line .v { color: var(--amber); text-align: right; font-size: 15px; font-weight: 500; }
+  .split-line.output .v { color: var(--amber-soft); }
+  .split-line.input  .v { color: var(--fg-dim); }
+  .split-foot {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule-2);
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .split-foot b { color: var(--fg-dim); font-weight: 400; }
+  .split-foot .v { color: var(--green); }
+
+  /* tool lines */
+  .tool-line {
+    display: grid;
+    grid-template-columns: 22px 1fr 80px 80px;
+    gap: 12px;
+    padding: 5px 0;
+    align-items: baseline;
+    font-size: 14px;
+  }
+  .tool-line .idx { color: var(--fg-faint); font-size: 12px; }
+  .tool-line .k   { color: var(--fg); font-weight: 500; }
+  .tool-line .calls { color: var(--fg-mute); text-align: right; font-size: 13px; }
+  .tool-line .bytes { color: var(--fg-dim); text-align: right; }
+  .tool-line.more .k { color: var(--fg-mute); font-weight: 400; }
+  .tool-line.more .bytes { color: var(--fg-mute); }
+  .tool-divider {
+    border-top: 1px solid var(--rule-2);
+    margin: 8px 0 6px;
+  }
+
+  /* outcomes grid */
+  .outcomes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 22px;
+  }
+  .stat .stat-v {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+  .stat .stat-v .small {
+    color: var(--fg-mute);
+    font-size: 14px;
+    font-weight: 400;
+  }
+  .stat .stat-v.green  { color: var(--green); }
+  .stat .stat-v.amber  { color: var(--amber); }
+  .stat .stat-l {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+    margin-top: 4px;
+  }
+
+  /* expanded foot meta */
+  .exp-foot {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .exp-foot span b { color: var(--fg-dim); font-weight: 400; }
+  .exp-foot .actions { margin-left: auto; display: flex; gap: 14px; }
+  .exp-foot .actions button {
+    color: var(--fg-mute);
+    border: 1px solid var(--rule);
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .exp-foot .actions button:hover { color: var(--fg); border-color: var(--fg-faint); }
+  .exp-foot .actions button kbd {
+    color: var(--amber);
+    margin-right: 6px;
+  }
+
+  /* totals row */
+  .totals {
+    display: grid;
+    grid-template-columns: 22px 2fr 140px 130px 110px 150px;
+    gap: 20px;
+    padding: 16px 28px;
+    border-top: 1px solid var(--rule);
+    background: var(--sidebar);
+    font-size: 14px;
+  }
+  .totals .lbl { color: var(--fg-mute); text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; }
+  .totals .v { text-align: right; color: var(--fg-dim); }
+  .totals .v.cost { color: var(--amber); font-weight: 500; font-size: 15px; }
+
+  /* ─────────── status bar ─────────── */
+  .statusbar {
+    grid-column: 2 / 3;
+    border-top: 1px solid var(--rule);
+    background: var(--sidebar);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    font-size: 12px;
+    color: var(--fg-mute);
+    gap: 20px;
+    height: 28px;
+  }
+  .statusbar .sep { color: var(--fg-faint); }
+  .statusbar .pulse {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px rgba(74, 186, 106, 0.6);
+    display: inline-block;
+    margin-right: 7px;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+  .statusbar .right { margin-left: auto; display: flex; gap: 18px; }
+  .statusbar kbd {
+    color: var(--fg);
+    background: var(--bg-stripe);
+    border: 1px solid var(--rule);
+    padding: 0 5px;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+
+  /* tiny helpers */
+  .green { color: var(--green); }
+  .amber { color: var(--amber); }
+  .muted { color: var(--fg-mute); }
+  .dim   { color: var(--fg-dim); }
+  .loading { padding: 40px 28px; color: var(--fg-mute); }
+
+  /* KPI cards */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    margin: 0 28px 0;
+    border: 1px solid var(--rule);
+  }
+  .kpi {
+    background: var(--bg);
+    padding: 20px 22px;
+  }
+  .kpi .kpi-v {
+    font-size: 26px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+  .kpi .kpi-v.amber { color: var(--amber); }
+  .kpi .kpi-v.green { color: var(--green); }
+  .kpi .kpi-l {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+    margin-top: 6px;
+  }
+  .kpi .kpi-sub {
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-top: 4px;
+  }
+
+  /* overview project list */
+  .ov-project {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 100px;
+    gap: 20px;
+    padding: 12px 28px;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rule-3);
+    font-size: 14px;
+  }
+  .ov-project.stripe { background: var(--bg-stripe); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ─────────── sidebar ─────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="mark">agent<span class="dot">·</span>meter</span>
+      <span class="ver">v0.4.2</span>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">workspace</div>
+      <button class="nav-item" data-view="overview">
+        <span class="nav-key">1</span>
+        <span class="nav-name">Overview</span>
+        <span></span>
+      </button>
+      <button class="nav-item active" data-view="projects">
+        <span class="nav-key">2</span>
+        <span class="nav-name">Projects</span>
+        <span class="badge" id="badge-projects">—</span>
+      </button>
+      <button class="nav-item" data-view="sessions">
+        <span class="nav-key">3</span>
+        <span class="nav-name">Sessions</span>
+        <span class="badge" id="badge-sessions">—</span>
+      </button>
+      <button class="nav-item" data-view="daily">
+        <span class="nav-key">4</span>
+        <span class="nav-name">Daily</span>
+        <span></span>
+      </button>
+      <button class="nav-item" data-view="strategy">
+        <span class="nav-key">5</span>
+        <span class="nav-name">Strategy</span>
+        <span></span>
+      </button>
+      <button class="nav-item" data-view="rates">
+        <span class="nav-key">6</span>
+        <span class="nav-name">Rates</span>
+        <span></span>
+      </button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="k">billing cycle</div>
+      <div class="row"><span class="v">may 2026</span><span class="v">day 18 / 31</span></div>
+      <div style="margin-top: 10px;">
+        <div class="row"><span class="v">spent</span><span class="v cost">$2,538</span></div>
+        <div class="row"><span class="v">cap</span><span class="v">$5,000</span></div>
+        <div class="progress"><i></i></div>
+        <div class="pct">50.8% · projected eom $4,371</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─────────── content (JS-rendered) ─────────── -->
+  <main class="content" id="content">
+    <div class="loading">Loading project data...</div>
+  </main>
+
+  <!-- keep this comment to mark where static content was removed -->
+
+  <!-- ─────────── status bar ─────────── -->
+  <div class="statusbar">
+    <span><span class="pulse"></span>live</span>
+    <span class="sep">│</span>
+    <span>view: <span class="dim">projects</span></span>
+    <span class="sep">│</span>
+    <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
+    <span><kbd>/</kbd> filter</span>
+    <span><kbd>→</kbd> expand</span>
+    <span><kbd>1</kbd>–<kbd>6</kbd> menu</span>
+    <span class="right">
+      <span>tail -f ~/.agentmeter/events.log</span>
+      <span class="sep">│</span>
+      <span class="dim">2026-05-19 14:22:08 UTC</span>
+    </span>
+  </div>
+
+</div>
+<script>
+// Data source is our own local SQLite via localhost API — no external input.
+// All rendered values come from agentmeter's DB, not user-supplied content.
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let DATA = null;
+let openProject = null;
+
+function fmt(n) { return n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtI(n) { return n.toLocaleString('en-US'); }
+function fmtBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+function fmtTokens(t) {
+  if (t >= 1e9) return (t/1e9).toFixed(1) + 'B';
+  if (t >= 1e6) return (t/1e6).toFixed(1) + 'M';
+  if (t >= 1e3) return (t/1e3).toFixed(1) + 'k';
+  return t.toString();
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.textContent; }
+
+function renderProjects(data) {
+  DATA = data;
+  const main = document.getElementById('content');
+  const ps = data.projects;
+  const parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>projects</b></div>',
+    '<div class="right">',
+    '<div class="field"><span class="k">scope</span><span class="v">month</span></div>',
+    '<div class="field"><span class="k">window</span><span class="v">', esc(data.window.start), ' → ', esc(data.window.end), '</span></div>',
+    '<div class="field"><span class="k">currency</span><span class="v">USD</span></div>',
+    '</div></div>',
+    '<div class="view-head"><div class="view-title">Projects</div>',
+    '<div class="view-sub"><b>', ps.length, '</b> tracked · <b>', data.totalSessions, '</b> sessions</div>',
+    '<div class="view-actions"><button class="on">sort:cost</button><button>sort:name</button><button>sort:recent</button></div></div>',
+    '<div class="col-head"><span></span><span>project</span><span>share · mtd</span>',
+    '<span class="num">sessions</span><span class="num">last run</span><span class="num">cost · mtd</span></div>'
+  );
+
+  ps.forEach(function(p, i) {
+    const isOpen = openProject === p.name;
+    const stripe = (!isOpen && i % 2 === 1) ? ' stripe' : '';
+    const openCls = isOpen ? ' open' : '';
+
+    parts.push(
+      '<div class="row', stripe, openCls, '" data-project="', esc(p.name), '">',
+      '<span class="caret">', isOpen ? '▾' : '▸', '</span>',
+      '<span class="name"><span class="label">', esc(p.name), '</span></span>',
+      '<span class="share-cell"><span class="track"><i style="width:', p.sharePct, '%;"></i></span>',
+      '<span class="pct">', p.sharePct, '%</span></span>',
+      '<span class="num">', p.sessions, '</span>',
+      '<span class="last">', esc(p.lastRun), '</span>',
+      '<span class="cost">$', fmt(p.cost), '</span></div>'
+    );
+
+    if (isOpen) {
+      var cs = p.costSplit;
+      var o = p.outcomes;
+      parts.push(
+        '<div class="expanded"><div class="exp-grid">',
+        '<div class="exp-cell"><div class="exp-h">cost split · $', fmt(p.cost), '</div>',
+        '<div class="split-line cache"><span class="k">cache</span><span class="pct">', cs.cachePct, '%</span>',
+        '<span class="bar"><i style="width:', cs.cachePct, '%;"></i></span><span class="v">$', fmt(cs.cache), '</span></div>',
+        '<div class="split-line output"><span class="k">output</span><span class="pct">', cs.outputPct, '%</span>',
+        '<span class="bar"><i style="width:', cs.outputPct, '%;"></i></span><span class="v">$', fmt(cs.output), '</span></div>',
+        '<div class="split-line input"><span class="k">input</span><span class="pct">', cs.inputPct, '%</span>',
+        '<span class="bar"><i style="width:', cs.inputPct, '%;"></i></span><span class="v">$', fmt(cs.input), '</span></div>',
+        '<div class="split-foot"><span><b>', fmtTokens(p.tokens), '</b> tokens · cache hit <span class="v">', p.cacheHitPct, '%</span></span>',
+        '<span class="green">saved ~$', fmtI(p.savedVsUncached), ' vs uncached</span></div></div>'
+      );
+
+      parts.push('<div class="exp-cell"><div class="exp-h">top tools · by data volume</div>');
+      p.tools.forEach(function(t, j) {
+        parts.push(
+          '<div class="tool-line"><span class="idx">', String(j+1).padStart(2,'0'), '</span>',
+          '<span class="k">', esc(t.name), '</span>',
+          '<span class="calls">', fmtI(t.calls), ' ×</span>',
+          '<span class="bytes">', fmtBytes(t.bytes), '</span></div>'
+        );
+      });
+      if (p.moreTools.count > 0) {
+        parts.push(
+          '<div class="tool-divider"></div>',
+          '<div class="tool-line more"><span class="idx"></span>',
+          '<span class="k">+ ', p.moreTools.count, ' more tools</span>',
+          '<span class="calls">', fmtI(p.moreTools.calls), ' ×</span>',
+          '<span class="bytes">', fmtBytes(p.moreTools.bytes), '</span></div>'
+        );
+      }
+      parts.push(
+        '<div class="split-foot" style="margin-top:18px"><span><b>', fmtTokens(p.totalToolCalls), '</b> total calls</span>',
+        '<span><b>', fmtBytes(p.totalToolBytes), '</b> data moved</span></div></div>'
+      );
+
+      parts.push(
+        '<div class="exp-cell"><div class="exp-h">outcomes</div><div class="outcomes-grid">',
+        '<div class="stat"><div class="stat-v green">', o.commits, '</div><div class="stat-l">commits</div></div>',
+        '<div class="stat"><div class="stat-v green">', fmtI(o.testsPassed),
+        o.testsFailed ? '<span class="small"> / ' + fmtI(o.testsPassed + o.testsFailed) + '</span>' : '',
+        '</div><div class="stat-l">tests passed</div></div>',
+        '<div class="stat"><div class="stat-v amber">', o.costPerCommit ? '$' + fmt(o.costPerCommit) : '—', '</div><div class="stat-l">cost · commit</div></div>',
+        '<div class="stat"><div class="stat-v">', o.filesChanged, '</div><div class="stat-l">files touched</div></div>',
+        '<div class="stat"><div class="stat-v">', o.costPerTest ? '$' + fmt(o.costPerTest) : '—', '</div><div class="stat-l">cost · test</div></div>',
+        '</div></div></div></div></div>'
+      );
+    }
+  });
+
+  parts.push(
+    '<div class="totals"><span></span><span class="lbl">total · ', ps.length, ' projects</span><span></span>',
+    '<span class="v">', data.totalSessions, '</span><span class="v">—</span>',
+    '<span class="v cost">$', fmt(data.totalCost), '</span></div>'
+  );
+
+  main.innerHTML = parts.join(''); // safe: all values from local DB via esc()
+
+  $$('.row[data-project]').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var name = row.dataset.project;
+      openProject = openProject === name ? null : name;
+      renderProjects(DATA);
+    });
+  });
+}
+
+// ─── Rates view ───
+function renderRates(rates) {
+  var main = document.getElementById('content');
+  var parts = [];
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>rates</b></div>',
+    '<div class="right"><div class="field"><span class="k">unit</span><span class="v">$ / 1M tok</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Rates</div>',
+    '<div class="view-sub"><b>', rates.length, '</b> models</div></div>',
+    '<div class="col-head" style="grid-template-columns: 2fr 100px 100px 100px 100px;">',
+    '<span>model</span><span class="num">input</span><span class="num">output</span>',
+    '<span class="num">cache · read</span><span class="num">cache · write</span></div>'
+  );
+
+  rates.forEach(function(r, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 2fr 100px 100px 100px 100px; cursor: default;">',
+      '<span class="name"><span class="label">', esc(r.displayName), '</span>',
+      '<span class="slug">', esc(r.modelId), '</span></span>',
+      '<span class="num">$', fmt(r.input), '</span>',
+      '<span class="num">$', fmt(r.output), '</span>',
+      '<span class="num">$', fmt(r.cacheRead), '</span>',
+      '<span class="num amber">$', fmt(r.cacheWrite), '</span>',
+      '</div>'
+    );
+  });
+
+  main.innerHTML = parts.join('');
+}
+
+// ─── Overview view ───
+function renderOverview(data) {
+  var main = document.getElementById('content');
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>overview</b></div>',
+    '<div class="right"><div class="field"><span class="k">period</span><span class="v">month to date</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Overview</div></div>',
+    '<div class="kpi-row">',
+    '<div class="kpi"><div class="kpi-v amber">$', fmt(data.totalCost), '</div>',
+    '<div class="kpi-l">total spend</div>',
+    '<div class="kpi-sub">projected $', fmt(data.projected), ' eom</div></div>',
+    '<div class="kpi"><div class="kpi-v">', data.totalSessions, '</div>',
+    '<div class="kpi-l">sessions</div>',
+    '<div class="kpi-sub">', data.projectCount, ' projects</div></div>',
+    '<div class="kpi"><div class="kpi-v green">', data.totalCommits, '</div>',
+    '<div class="kpi-l">commits</div>',
+    '<div class="kpi-sub">', fmtI(data.totalTests), ' tests passed</div></div>',
+    '<div class="kpi"><div class="kpi-v amber">$', fmt(data.costPerCommit), '</div>',
+    '<div class="kpi-l">cost · commit</div></div>',
+    '<div class="kpi"><div class="kpi-v">$', fmt(data.dailyAvg), '</div>',
+    '<div class="kpi-l">daily avg</div></div>',
+    '</div>'
+  );
+
+  // Project summary list
+  parts.push(
+    '<div style="padding:26px 28px 12px"><div class="exp-h">projects by cost</div></div>'
+  );
+  data.projects.forEach(function(p, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="ov-project', stripe, '">',
+      '<span><span style="color:var(--fg);font-weight:500">', esc(p.name), '</span></span>',
+      '<span class="num">', p.sharePct, '%</span>',
+      '<span class="num">', p.sessions, ' sessions</span>',
+      '<span class="cost" style="text-align:right;color:var(--amber);font-weight:500">$', fmt(p.cost), '</span>',
+      '</div>'
+    );
+  });
+
+  main.innerHTML = parts.join('');
+
+  // Update badges
+  var bp = document.getElementById('badge-projects');
+  if (bp) bp.textContent = data.projectCount;
+}
+
+// ─── Sessions view ───
+function renderSessions(data) {
+  var main = document.getElementById('content');
+  var ss = data.sessions;
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>sessions</b></div>',
+    '<div class="right"><div class="field"><span class="k">showing</span><span class="v">', ss.length, ' recent</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Sessions</div>',
+    '<div class="view-sub">recent first</div></div>',
+    '<div class="col-head" style="grid-template-columns: 90px 1fr 120px 70px 80px 100px 30px;">',
+    '<span>id</span><span>project</span><span>model</span>',
+    '<span class="num">calls</span><span class="num">tokens</span>',
+    '<span class="num">cost</span><span class="num"></span></div>'
+  );
+
+  ss.forEach(function(s, i) {
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    var check = s.hasOutcome ? '<span class="green">✓</span>' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 90px 1fr 120px 70px 80px 100px 30px; cursor: default;" title="',
+      esc(s.fullId), '&#10;', esc(s.started), '&#10;', esc(s.outcome || 'no outcome'), '">',
+      '<span class="dim" style="font-size:12px">', esc(s.id), '</span>',
+      '<span class="name"><span class="label" style="font-size:14px">', esc(s.project), '</span></span>',
+      '<span class="dim" style="font-size:12px">', esc(s.model.replace('claude-', '').replace('claude_', '')), '</span>',
+      '<span class="num" style="font-size:13px">', s.toolCalls, '</span>',
+      '<span class="num" style="font-size:13px">', fmtTokens(s.tokens), '</span>',
+      '<span class="cost" style="font-size:14px">', s.cost > 0 ? '$' + fmt(s.cost) : '—', '</span>',
+      '<span class="num">', check, '</span>',
+      '</div>'
+    );
+  });
+
+  main.innerHTML = parts.join('');
+
+  // Update badge
+  var badge = document.getElementById('badge-sessions');
+  if (badge) badge.textContent = ss.length;
+}
+
+// ─── Daily view ───
+function renderDaily(data) {
+  var main = document.getElementById('content');
+  var rows = data.days;
+  var maxCost = Math.max.apply(null, rows.map(function(r) { return r.cost; })) || 1;
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>daily</b></div>',
+    '<div class="right"><div class="field"><span class="k">range</span><span class="v">last ', rows.length, ' days</span></div></div></div>',
+    '<div class="view-head"><div class="view-title">Daily</div>',
+    '<div class="view-sub">total <b>$', fmt(data.totalCost), '</b></div></div>',
+    '<div class="col-head" style="grid-template-columns: 100px 100px 100px 1fr;">',
+    '<span>day</span><span class="num">cost</span><span class="num">sessions</span><span></span></div>'
+  );
+
+  rows.forEach(function(r, i) {
+    var barW = maxCost > 0 ? (r.cost / maxCost * 100) : 0;
+    var stripe = i % 2 === 1 ? ' stripe' : '';
+    parts.push(
+      '<div class="row', stripe, '" style="grid-template-columns: 100px 100px 100px 1fr; cursor: default;">',
+      '<span class="dim">', esc(r.day), '</span>',
+      '<span class="num amber">$', fmt(r.cost), '</span>',
+      '<span class="num">', r.sessions, '</span>',
+      '<span style="display:flex;align-items:center;gap:12px;">',
+      '<span class="track" style="flex:1;height:6px;background:var(--fg-ghost);position:relative;">',
+      '<i style="position:absolute;inset:0 auto 0 0;background:var(--amber);width:', barW.toFixed(1), '%;"></i></span>',
+      '<span class="muted" style="font-size:12px;min-width:50px">', fmtI(r.calls), ' calls</span>',
+      '</span></div>'
+    );
+  });
+
+  parts.push(
+    '<div class="totals" style="grid-template-columns: 100px 100px 100px 1fr;">',
+    '<span class="lbl">total</span>',
+    '<span class="v cost">$', fmt(data.totalCost), '</span>',
+    '<span></span><span></span></div>'
+  );
+
+  main.innerHTML = parts.join('');
+}
+
+// ─── Strategy view ───
+function renderStrategy(data) {
+  var main = document.getElementById('content');
+  var parts = [];
+
+  parts.push(
+    '<div class="topbar"><div class="crumb"><span>workspace</span><span class="sep">/</span><b>strategy</b></div></div>',
+    '<div class="view-head"><div class="view-title">Strategy</div>',
+    '<div class="view-sub">budget rules · circuit breakers · recommendations</div></div>'
+  );
+
+  // Budgets
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">budget rules</div>');
+  if (data.budgets.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No budget rules configured. Use: agentmeter budget set daily 200</div>');
+  } else {
+    data.budgets.forEach(function(b) {
+      parts.push(
+        '<div style="padding:6px 0;font-size:14px">',
+        '<span class="dim">', esc(b.scope), '</span> ',
+        '<span style="color:var(--fg)">', b.maxCalls, ' calls</span> ',
+        '<span class="muted">for </span><span class="dim">', esc(b.serverName), '</span> ',
+        '<span class="muted">→ </span>',
+        b.action === 'deny' ? '<span class="amber">deny</span>' : '<span class="green">warn</span>',
+        '</div>'
+      );
+    });
+  }
+  parts.push('</div>');
+
+  // Breakers
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">circuit breakers</div>');
+  if (data.breakers.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No breakers configured. Use: agentmeter breaker set 20 60</div>');
+  } else {
+    data.breakers.forEach(function(b) {
+      parts.push(
+        '<div style="padding:6px 0;font-size:14px">',
+        '<span style="color:var(--fg)">', b.maxCalls, ' calls</span> ',
+        '<span class="muted">in </span><span class="dim">', b.windowSeconds, 's</span> ',
+        '<span class="muted">→ cooldown </span><span class="dim">', b.cooldownSeconds, 's</span> ',
+        '<span class="muted">for </span><span class="dim">', esc(b.serverName), '</span>',
+        '</div>'
+      );
+    });
+  }
+
+  // Recent trips
+  if (data.recentTrips.length > 0) {
+    parts.push('<div style="margin-top:12px"><div class="exp-h" style="color:var(--red)">recent trips</div>');
+    data.recentTrips.forEach(function(t) {
+      parts.push(
+        '<div style="padding:4px 0;font-size:13px">',
+        '<span class="dim">', esc(t.trippedAt.slice(0,19).replace('T',' ')), '</span> ',
+        '<span class="muted">', esc(t.serverName), ' — ', t.callCount, ' calls in ', t.windowSeconds, 's</span>',
+        '</div>'
+      );
+    });
+    parts.push('</div>');
+  }
+  parts.push('</div>');
+
+  // Recommendations
+  parts.push('<div style="padding:0 28px 24px">',
+    '<div class="exp-h">recommendations</div>');
+  if (data.recommendations.length === 0) {
+    parts.push('<div class="dim" style="padding:8px 0">No recommendations — usage patterns look healthy.</div>');
+  } else {
+    data.recommendations.forEach(function(r, i) {
+      parts.push(
+        '<div style="padding:8px 0;font-size:14px;border-bottom:1px solid var(--rule-3)">',
+        '<span class="amber" style="font-size:12px;margin-right:8px">', (i+1), '.</span>',
+        '<span class="dim">', esc(r), '</span></div>'
+      );
+    });
+  }
+  parts.push('</div>');
+
+  main.innerHTML = parts.join('');
+}
+
+// ─── View routing ───
+var currentView = 'projects';
+
+function switchView(view) {
+  currentView = view;
+  // Update nav active state
+  $$('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  // Update status bar
+  var viewLabel = document.querySelector('.statusbar .view-name');
+  if (viewLabel) viewLabel.textContent = view;
+
+  var main = document.getElementById('content');
+  main.innerHTML = '<div class="loading">Loading...</div>';
+
+  if (view === 'overview') {
+    fetch('/api/overview').then(function(r) { return r.json(); }).then(renderOverview)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'projects') {
+    fetch('/api/projects').then(function(r) { return r.json(); }).then(renderProjects)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'rates') {
+    fetch('/api/rates').then(function(r) { return r.json(); }).then(renderRates)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'sessions') {
+    fetch('/api/sessions').then(function(r) { return r.json(); }).then(renderSessions)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'strategy') {
+    fetch('/api/strategy').then(function(r) { return r.json(); }).then(renderStrategy)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else if (view === 'daily') {
+    fetch('/api/daily').then(function(r) { return r.json(); }).then(renderDaily)
+      .catch(function(e) { main.textContent = 'Error: ' + e.message; });
+  } else {
+    main.innerHTML = '<div class="loading">View "' + esc(view) + '" — coming soon</div>';
+  }
+}
+
+// Bind nav clicks
+$$('.nav-item[data-view]').forEach(function(el) {
+  el.addEventListener('click', function() { switchView(el.dataset.view); });
+});
+
+// Keyboard shortcuts: 1-6 for views
+document.addEventListener('keydown', function(e) {
+  var views = ['overview', 'projects', 'sessions', 'daily', 'strategy', 'rates'];
+  var idx = parseInt(e.key) - 1;
+  if (idx >= 0 && idx < views.length && !e.ctrlKey && !e.metaKey) {
+    switchView(views[idx]);
+  }
+});
+
+// Initial load
+switchView('projects');
+
+// Update status bar timestamp
+var ts = document.querySelector('.statusbar .dim');
+if (ts) ts.textContent = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+</script>
+</body>
+</html>
