@@ -15,6 +15,11 @@ dependencies = [
     "anyio>=4.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/aussiealex/agentmeter"
+Repository = "https://github.com/aussiealex/agentmeter"
+Issues = "https://github.com/aussiealex/agentmeter/issues"
+
 [project.scripts]
 agentmeter = "agentmeter.cli:main"
 
