@@ -465,7 +465,7 @@ def _exploration_no_output(ctx: AnalysisContext) -> Finding | None:
 
 
 def _large_result_read(ctx: AnalysisContext) -> list[Finding] | None:
-    """Read calls with result_size >30KB, excluding images (handled separately)."""
+    """Large Read results: >100KB once, or >30KB read multiple times."""
     image_exts = (".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp")
 
     clauses, params = _session_clauses(ctx)
@@ -494,6 +494,10 @@ def _large_result_read(ctx: AnalysisContext) -> list[Finding] | None:
 
         # Skip images — handled by _binary_image_reads
         if path.lower().endswith(image_exts):
+            continue
+
+        # Single reads under 100KB are fine — only flag repeats or huge files
+        if r["times"] <= 1 and r["result_size"] < 100_000:
             continue
 
         filename = path.rsplit("/", 1)[-1] if "/" in path else path
