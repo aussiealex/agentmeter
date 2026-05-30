@@ -666,8 +666,8 @@ function renderProjects(data) {
         '<span class="bar"><i style="width:', cs.outputPct, '%;"></i></span><span class="v">$', fmt(cs.output), '</span></div>',
         '<div class="split-line input"><span class="k">input</span><span class="pct">', cs.inputPct, '%</span>',
         '<span class="bar"><i style="width:', cs.inputPct, '%;"></i></span><span class="v">$', fmt(cs.input), '</span></div>',
-        '<div class="split-foot"><span><b>', fmtTokens(p.tokens), '</b> tokens · cache hit <span class="v">', p.cacheHitPct, '%</span></span>',
-        '<span class="green">saved ~$', fmtI(p.savedVsUncached), ' vs uncached</span></div></div>'
+        '<div class="split-foot"><span><b>', fmtTokens(p.tokens), '</b> tokens · cache efficiency <span class="v">', p.cacheEfficiency, '%</span></span>',
+        '<span class="green">saved $', fmt(p.cacheSaved), ' vs uncached</span></div></div>'
       );
 
       parts.push('<div class="exp-cell"><div class="exp-h">top tools · by data volume</div>');

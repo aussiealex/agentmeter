@@ -114,6 +114,29 @@ def calculate_session_cost(
     )
 
 
+def cache_efficiency(tokens: SessionTokens) -> float | None:
+    """Cache hit rate as percentage, or None if no input tokens."""
+    input_total = (
+        tokens.cache_read_tokens
+        + tokens.cache_creation_tokens
+        + tokens.input_tokens
+    )
+    if input_total == 0:
+        return None
+    return tokens.cache_read_tokens / input_total * 100
+
+
+def cache_savings(tokens: SessionTokens, rate: RateCard) -> float:
+    """Dollar amount saved by cache reads vs full input rate."""
+    if rate.cached_per_mtok >= rate.input_per_mtok:
+        return 0.0
+    return (
+        tokens.cache_read_tokens
+        * (rate.input_per_mtok - rate.cached_per_mtok)
+        / 1_000_000
+    )
+
+
 def derive_project_slug(project_dir: str) -> str:
     """Derive Claude Code's project slug from a directory path.
 

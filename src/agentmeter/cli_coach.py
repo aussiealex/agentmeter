@@ -65,9 +65,16 @@ def review(session_id: str | None) -> None:
 
     # Cost data
     cost_str = ""
-    session_cost = _get_session_cost(db, session)
-    if session_cost is not None:
-        cost_str = f"  ${session_cost:.2f}"
+    tokens = None
+    rate = None
+    jsonl_path = find_session_jsonl(session.id, session.server_command)
+    if jsonl_path:
+        tokens = read_session_tokens_from_file(jsonl_path)
+        if tokens and tokens.llm_call_count > 0:
+            rate = db.get_rate(tokens.model_id)
+            if rate:
+                cost_data = calculate_session_cost(tokens, rate)
+                cost_str = f"  ${cost_data.total_cost:.2f}"
 
     # Tool breakdown
     click.echo(f"  {total_calls} tool calls{cost_str}")
@@ -93,7 +100,10 @@ def review(session_id: str | None) -> None:
         click.echo(f"  Outcome: {', '.join(parts) if parts else session.outcome}")
 
     # Run heuristics
-    ctx = AnalysisContext(conn=db._conn, session_id=session.id)
+    ctx = AnalysisContext(
+        conn=db._conn, session_id=session.id,
+        tokens=tokens, rate=rate,
+    )
     findings = analyse_session(ctx)
 
     # Score
@@ -163,20 +173,6 @@ def _efficiency_score(findings: list[Finding], total_calls: int) -> int:
     score = max(1, min(10, round(10 - penalty)))
     return score
 
-
-def _get_session_cost(db: MeterDB, session) -> float | None:
-    """Get real token cost for a session, or None if unavailable."""
-    jsonl_path = find_session_jsonl(session.id, session.server_command)
-    if not jsonl_path:
-        return None
-    tokens = read_session_tokens_from_file(jsonl_path)
-    if not tokens or tokens.llm_call_count == 0:
-        return None
-    rate = db.get_rate(tokens.model_id)
-    if not rate:
-        return None
-    cost_data = calculate_session_cost(tokens, rate)
-    return cost_data.total_cost
 
 
 def _print_review_findings(findings: list[Finding]) -> None:

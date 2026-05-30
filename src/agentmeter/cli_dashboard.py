@@ -14,6 +14,7 @@ import click
 from agentmeter.db import MeterDB
 from agentmeter.platform import project_name
 from agentmeter.session_reader import (
+    cache_savings,
     calculate_session_cost,
     find_session_jsonl,
     read_session_tokens_from_file,
@@ -139,6 +140,8 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
         input_cost = 0.0
         total_tokens = 0
         cache_read_tokens = 0
+        total_input_side = 0
+        proj_saved = 0.0
         llm_calls = 0
         session_count = 0
         commits = 0
@@ -169,6 +172,12 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
                 + tokens.cache_read_tokens + tokens.output_tokens
             )
             cache_read_tokens += tokens.cache_read_tokens
+            total_input_side += (
+                tokens.cache_read_tokens
+                + tokens.cache_creation_tokens
+                + tokens.input_tokens
+            )
+            proj_saved += cache_savings(tokens, rate)
             llm_calls += tokens.llm_call_count
             session_count += 1
             commits += s.commits
@@ -200,13 +209,9 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
         cache_pct = (cache_read_cost / proj_cost * 100) if proj_cost > 0 else 0
         output_pct = (output_cost / proj_cost * 100) if proj_cost > 0 else 0
         input_pct = (input_cost / proj_cost * 100) if proj_cost > 0 else 0
-        cache_hit = (
-            cache_read_tokens / total_tokens * 100
-        ) if total_tokens > 0 else 0
-
-        # Estimate uncached cost
-        uncached_cost = proj_cost / 0.1 if cache_pct > 50 else proj_cost * 2
-        saved = uncached_cost - proj_cost
+        cache_eff = (
+            cache_read_tokens / total_input_side * 100
+        ) if total_input_side > 0 else 0
 
         projects.append({
             "name": ps.project,
@@ -222,8 +227,8 @@ def build_projects_data(db: MeterDB, days: int = 30) -> dict:
                 "inputPct": round(input_pct, 1),
             },
             "tokens": total_tokens,
-            "cacheHitPct": round(cache_hit, 1),
-            "savedVsUncached": round(saved, 0),
+            "cacheEfficiency": round(cache_eff, 1),
+            "cacheSaved": round(proj_saved, 2),
             "llmCalls": llm_calls,
             "tools": tools,
             "moreTools": {

@@ -7,6 +7,8 @@ import click
 from agentmeter.db import MeterDB
 from agentmeter.platform import project_name
 from agentmeter.session_reader import (
+    cache_efficiency,
+    cache_savings,
     calculate_session_cost,
     find_session_jsonl,
     read_session_tokens_from_file,
@@ -125,6 +127,19 @@ def _show_session_cost(db: MeterDB, session_id: str) -> None:
         f"${cost_data.total_cost:>8.4f}"
     )
 
+    # Cache intelligence lines
+    eff = cache_efficiency(tokens)
+    if eff is not None and tokens.cache_read_tokens > 0:
+        click.echo(f"  Cache efficiency:  {eff:.0f}%")
+    saved = cache_savings(tokens, rate)
+    if saved > 0.01:
+        hypothetical = cost_data.total_cost + saved
+        saved_pct = saved / hypothetical * 100
+        click.echo(
+            f"  Cache saved:       ${saved:.2f} "
+            f"({saved_pct:.0f}% less than without caching)"
+        )
+
     if ss and ss.tools:
         click.echo()
         click.echo(f"  Tool calls: {ss.total_calls}")
@@ -226,6 +241,18 @@ def _show_recent_costs(db: MeterDB, limit: int) -> None:
         )
         if outcome_parts:
             click.echo(f"    Outcomes: {', '.join(outcome_parts)}")
+
+        # Cache intelligence lines
+        eff = cache_efficiency(tokens)
+        if eff is not None and tokens.cache_read_tokens > 0:
+            click.echo(f"    Cache efficiency: {eff:.0f}%")
+        saved = cache_savings(tokens, rate)
+        if saved > 0.01:
+            hypothetical = cost_data.total_cost + saved
+            saved_pct = saved / hypothetical * 100
+            click.echo(
+                f"    Cache saved:     ${saved:.2f} ({saved_pct:.0f}%)"
+            )
 
         any_cost = True
 

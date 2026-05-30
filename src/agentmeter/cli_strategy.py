@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 import click
 
 from agentmeter.db import MeterDB
-from agentmeter.models import SessionCost, SessionTokens, ToolStats
+from agentmeter.models import RateCard, SessionCost, SessionTokens, ToolStats
 from agentmeter.platform import project_name
 from agentmeter.session_reader import (
+    cache_savings,
     calculate_session_cost,
     find_session_jsonl,
     read_session_tokens_from_file,
@@ -55,15 +56,16 @@ def _classify(project: str) -> tuple[str, int]:
 class _SessionData:
     """Token and cost data for one session."""
 
-    __slots__ = ("cost", "tokens", "session_id")
+    __slots__ = ("cost", "tokens", "session_id", "rate")
 
     def __init__(
         self, session_id: str, tokens: SessionTokens,
-        cost: SessionCost,
+        cost: SessionCost, rate: RateCard,
     ) -> None:
         self.session_id = session_id
         self.tokens = tokens
         self.cost = cost
+        self.rate = rate
 
 
 class _ProjectData:
@@ -133,6 +135,25 @@ class _ProjectData:
     def cache_read_pct(self) -> float:
         t = self.total_cost
         return (self.cache_read_cost / t * 100) if t > 0 else 0
+
+    @property
+    def total_cache_savings(self) -> float:
+        return sum(
+            cache_savings(s.tokens, s.rate) for s in self.sessions
+        )
+
+    @property
+    def aggregate_cache_efficiency(self) -> float | None:
+        total_read = sum(s.tokens.cache_read_tokens for s in self.sessions)
+        total_input = sum(
+            s.tokens.cache_read_tokens
+            + s.tokens.cache_creation_tokens
+            + s.tokens.input_tokens
+            for s in self.sessions
+        )
+        if total_input == 0:
+            return None
+        return total_read / total_input * 100
 
 
 @click.command()
@@ -215,7 +236,7 @@ def strategy(days: int) -> None:
         cost_data = calculate_session_cost(tokens, rate)
         if project in proj_map:
             proj_map[project].sessions.append(
-                _SessionData(session.id, tokens, cost_data),
+                _SessionData(session.id, tokens, cost_data, rate),
             )
 
     db.close()
@@ -293,6 +314,19 @@ def _print_project(
             f" | input "
             f"{_pct(p.input_cost, p.total_cost):.0f}%",
         )
+
+        # Cache intelligence
+        eff = p.aggregate_cache_efficiency
+        if eff is not None and eff > 0:
+            click.echo(f"    Cache efficiency: {eff:.0f}%")
+        saved = p.total_cache_savings
+        if saved > 0.01:
+            hypothetical = p.total_cost + saved
+            saved_pct = saved / hypothetical * 100
+            click.echo(
+                f"    Cache saved: ${saved:.2f} "
+                f"({saved_pct:.0f}% less than without caching)"
+            )
 
         # Outlier detection
         if n_sess >= 2:

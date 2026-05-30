@@ -11,6 +11,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from agentmeter.db._helpers import build_where
+from agentmeter.models import RateCard, SessionTokens
 
 
 @dataclass
@@ -21,6 +22,8 @@ class AnalysisContext:
     since: str | None = None
     project: str | None = None
     session_id: str | None = None
+    tokens: SessionTokens | None = None
+    rate: RateCard | None = None
 
 
 @dataclass
@@ -61,6 +64,8 @@ def analyse_session(ctx: AnalysisContext) -> list[Finding]:
         _low_search_high_read,
         _exploration_no_output,
         _large_result_read,
+        _cache_write_waste,
+        _low_cache_efficiency,
     ]
     return _run(runners, ctx)
 
@@ -510,6 +515,93 @@ def _large_result_read(ctx: AnalysisContext) -> list[Finding] | None:
         ))
 
     return findings
+
+
+# ---------------------------------------------------------------------------
+# Cache intelligence heuristics (use SessionTokens, not DB)
+# ---------------------------------------------------------------------------
+
+def _cache_write_waste(ctx: AnalysisContext) -> Finding | None:
+    """Short sessions where cache write premium wasn't recouped."""
+    if ctx.tokens is None or ctx.rate is None:
+        return None
+    t = ctx.tokens
+    if t.cache_creation_tokens == 0:
+        return None
+    if t.llm_call_count >= 10:
+        return None
+    if t.cache_read_tokens >= t.cache_creation_tokens * 2:
+        return None
+
+    from agentmeter.session_reader import cache_savings, calculate_session_cost
+
+    cost = calculate_session_cost(t, ctx.rate)
+    write_premium = cost.cache_create_cost - (
+        t.cache_creation_tokens * ctx.rate.input_per_mtok / 1_000_000
+    )
+    saved = cache_savings(t, ctx.rate)
+
+    return Finding(
+        pattern="cache_write_waste",
+        severity="info",
+        scope="session",
+        summary=(
+            f"{t.llm_call_count} LLM calls — cache write premium "
+            f"(${write_premium:.2f}) exceeded read savings (${saved:.2f})"
+        ),
+        advice=(
+            "Short sessions don't benefit from caching. "
+            "This isn't actionable — just explains why cost/call is higher."
+        ),
+        data={
+            "llm_calls": t.llm_call_count,
+            "cache_write_cost": round(cost.cache_create_cost, 4),
+            "cache_read_cost": round(cost.cache_read_cost, 4),
+            "cache_creation_tokens": t.cache_creation_tokens,
+            "cache_read_tokens": t.cache_read_tokens,
+        },
+    )
+
+
+def _low_cache_efficiency(ctx: AnalysisContext) -> Finding | None:
+    """High token volume with poor cache hit rate."""
+    if ctx.tokens is None:
+        return None
+    t = ctx.tokens
+    if t.llm_call_count < 15:
+        return None
+
+    input_total = (
+        t.cache_read_tokens + t.cache_creation_tokens + t.input_tokens
+    )
+    if input_total < 100_000:
+        return None
+
+    eff = t.cache_read_tokens / input_total * 100
+    if eff >= 40:
+        return None
+
+    return Finding(
+        pattern="low_cache_efficiency",
+        severity="warning",
+        scope="session",
+        summary=(
+            f"Cache efficiency {eff:.0f}% over {t.llm_call_count} LLM calls "
+            f"({input_total:,} input tokens mostly uncached)"
+        ),
+        advice=(
+            "Most input tokens aren't hitting cache. Possible causes: "
+            "long gaps between turns (>5min cache TTL), "
+            "or agent restructuring prompts between calls."
+        ),
+        data={
+            "cache_efficiency": round(eff, 1),
+            "llm_calls": t.llm_call_count,
+            "input_tokens": t.input_tokens,
+            "cache_read_tokens": t.cache_read_tokens,
+            "cache_creation_tokens": t.cache_creation_tokens,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
