@@ -21,22 +21,28 @@ def coach() -> None:
 
 @coach.command()
 @click.argument("session_id", required=False)
-def review(session_id: str | None) -> None:
+@click.option(
+    "--project", "-p", default=None,
+    help="Filter to the most recent session for a project.",
+)
+def review(session_id: str | None, project: str | None) -> None:
     """Review a session for efficiency patterns.
 
     Analyses tool call patterns from a single session and gives
     actionable advice on how to reduce cost next time.
 
     If SESSION_ID is omitted, reviews the most recent session.
+    Use -p to filter by project name (substring match).
     Partial IDs work (e.g. first 8 characters).
 
     Examples:
         agentmeter coach review
+        agentmeter coach review -p PolicyGuardian
         agentmeter coach review 4d44d158
     """
     db = MeterDB()
 
-    session = _resolve_session(db, session_id)
+    session = _resolve_session(db, session_id, project)
     if not session:
         label = session_id or "any"
         click.echo(f"\n  No session found: {label}\n")
@@ -122,21 +128,32 @@ def review(session_id: str | None) -> None:
     db.close()
 
 
-def _resolve_session(db: MeterDB, session_id: str | None):
-    """Find session by partial ID, name, or most recent."""
+def _resolve_session(
+    db: MeterDB, session_id: str | None,
+    project: str | None = None,
+):
+    """Find session by partial ID, name, project, or most recent."""
     sessions = db.get_sessions(limit=100)
     if not sessions:
         return None
 
-    if not session_id:
-        return sessions[0]  # most recent
+    if session_id:
+        for s in sessions:
+            if (s.id == session_id
+                    or s.id.startswith(session_id)
+                    or (s.name and s.name == session_id)):
+                return s
+        return None
 
-    for s in sessions:
-        if (s.id == session_id
-                or s.id.startswith(session_id)
-                or (s.name and s.name == session_id)):
-            return s
-    return None
+    if project:
+        query = project.lower()
+        for s in sessions:
+            proj = project_name(s.server_command).lower()
+            if query in proj or proj in query:
+                return s
+        return None
+
+    return sessions[0]  # most recent
 
 
 def _session_tool_stats(db: MeterDB, session_id: str) -> dict[str, int]:
