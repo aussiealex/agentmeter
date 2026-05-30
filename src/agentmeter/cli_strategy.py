@@ -16,42 +16,6 @@ from agentmeter.session_reader import (
     read_session_tokens_from_file,
 )
 
-# Project-to-role mapping from business-thesis.md.
-_PROJECT_ROLES: dict[str, tuple[str, int]] = {
-    "complyit": ("Revenue Engine", 1),
-    "securityconsultancy": ("Revenue Engine", 1),
-    "security-consultancy": ("Revenue Engine", 1),
-    "agentmeter": ("Long-Term Bet", 2),
-    "ralph_modey": ("Long-Term Bet", 2),
-    "modeyapp": ("Long-Term Bet", 2),
-    "policyguardian": ("Moat Builder", 3),
-    "deviceguardian": ("Moat Builder", 3),
-    "mailsift": ("Moat Builder", 3),
-    "ralph": ("Moat Builder", 3),
-    "politicks": ("Personal", 4),
-    "cybercheck": ("Personal", 4),
-    "cryptobot": ("Personal", 4),
-    "crypto-bot": ("Personal", 4),
-    "boopmynose": ("Personal", 4),
-    "boop": ("Personal", 4),
-    "saelection": ("Personal", 4),
-    "unisite": ("Personal", 4),
-    "smallshield": ("Personal", 4),
-}
-
-
-def _classify(project: str) -> tuple[str, int]:
-    """Map a project name to (role, priority)."""
-    key = (project.lower()
-           .replace(" ", "").replace("_", "").replace("-", ""))
-    if key in _PROJECT_ROLES:
-        return _PROJECT_ROLES[key]
-    for known, info in _PROJECT_ROLES.items():
-        cleaned = known.replace("-", "").replace("_", "")
-        if cleaned in key or key in cleaned:
-            return info
-    return ("Unknown", 5)
-
 
 class _SessionData:
     """Token and cost data for one session."""
@@ -72,19 +36,17 @@ class _ProjectData:
     """All data for one project."""
 
     __slots__ = (
-        "name", "role", "priority", "tools",
+        "name", "tools",
         "sessions", "call_count",
         "commits", "files_changed",
         "tests_passed", "tests_failed",
     )
 
     def __init__(
-        self, *, name: str, role: str, priority: int,
+        self, *, name: str,
         tools: list[ToolStats], call_count: int,
     ) -> None:
         self.name = name
-        self.role = role
-        self.priority = priority
         self.tools = tools
         self.call_count = call_count
         self.sessions: list[_SessionData] = []
@@ -199,12 +161,11 @@ def strategy(days: int) -> None:
     # Build project data with tool breakdowns
     proj_map: dict[str, _ProjectData] = {}
     for ps in project_stats:
-        role, priority = _classify(ps.project)
         tools = db.get_project_tool_breakdown(
             ps.project, since=since,
         )
         pd = _ProjectData(
-            name=ps.project, role=role, priority=priority,
+            name=ps.project,
             tools=tools, call_count=ps.call_count,
         )
         proj_map[ps.project] = pd
@@ -282,8 +243,7 @@ def _print_project(
     )
 
     click.echo(
-        f"  {p.name}  —  {cost_str}  ({pct:.0f}%)  "
-        f"[{p.role} #{p.priority}]",
+        f"  {p.name}  —  {cost_str}  ({pct:.0f}%)",
     )
 
     if p.total_cost > 0:
@@ -480,22 +440,6 @@ def _print_recommendations(
                 f"The difference is likely session length — "
                 f"longer sessions accumulate more cache per "
                 f"turn.",
-            )
-
-    # Priority misalignment
-    if total_cost > 0:
-        role_costs: dict[str, float] = {}
-        for p in projects:
-            role_costs[p.role] = (
-                role_costs.get(p.role, 0) + p.total_cost
-            )
-        personal_cost = role_costs.get("Personal", 0)
-        personal_pct = personal_cost / total_cost * 100
-        if personal_pct > 30:
-            recs.append(
-                f"Personal projects are {personal_pct:.0f}% "
-                f"of spend (${personal_cost:.2f}). "
-                f"Fine if intentional.",
             )
 
     if recs:
