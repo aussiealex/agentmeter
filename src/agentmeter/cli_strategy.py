@@ -445,9 +445,9 @@ def _print_recommendations(
                 recs.append(
                     f"{p.name}: Bash produced "
                     f"{_fmt_bytes(t.total_result_size)} of "
-                    f"output. Pipe through tail/head or "
-                    f"redirect to file to avoid polluting "
-                    f"context.",
+                    f"output. Limit command output to only "
+                    f"what you need — large results inflate "
+                    f"context every subsequent turn.",
                 )
                 break
             if (t.tool_name == "Agent"

@@ -321,8 +321,8 @@ def build_strategy_data(db: MeterDB) -> dict:
                 recs.append(
                     f"{name}: Bash produced "
                     f"{_fmt_bytes(t['bytes'])} of output. "
-                    f"Pipe through tail/head to avoid "
-                    f"polluting context."
+                    f"Limit command output to only what "
+                    f"you need — large results inflate context."
                 )
             if t["name"] == "Read" and t["calls"] > 50:
                 recs.append(
