@@ -7,34 +7,38 @@ use [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-30
+
 ### Added
+- **Cache intelligence** — cache efficiency metric (token hit rate) and
+  cache savings (dollars saved vs uncached) in `cost`, `strategy`, and
+  dashboard views.
+- **Cache waste heuristics** — `cache_write_waste` detects short sessions
+  where the 1.25x write premium wasn't recouped. `low_cache_efficiency`
+  detects high-volume sessions with poor cache hit rate.
+- **Session coaching** — `agentmeter coach review` analyses a single session
+  for efficiency patterns with a 1-10 score. Supports `-p` project filter.
+- **Heuristics engine** — 13 pattern detectors for tool call analysis.
+  Consumed by `advise`, `coach review`, and the web dashboard.
 - **Web dashboard** — `agentmeter dashboard` serves a local dashboard at
-  localhost:8070 with six views: overview KPIs, project breakdown, session
-  list, daily charts, strategy recommendations, and rate card management.
-  Single HTML + vanilla JS, no build step.
-- **Cross-platform support** — platform-aware data directory (Linux, macOS,
-  Windows), pathlib-based path handling throughout. Auto-detects OS at runtime.
+  localhost:8070 with six views: overview, projects, sessions, daily,
+  strategy, and rate card.
+- **Cross-platform support** — Linux, macOS, Windows data directories.
 - **Real token cost analysis** — `agentmeter cost` reads actual API token
-  counts from Claude Code session transcripts. No estimates.
-- **Spend forecasting** — `agentmeter forecast` projects monthly spend from
-  recent data.
-- **Spend advisory** — `agentmeter advise` analyses spending patterns and
-  generates recommendations.
-- **Strategy command** — `agentmeter strategy` gives per-project cost analysis
-  with actionable advice.
-- **Summary command** — `agentmeter summary` produces compact cost context
-  suitable for agent injection.
-- **Session outcomes** — tracks commits, files changed, and test results
-  per session via Bash call analysis.
-- **Data export** — `agentmeter export` outputs tool call data as JSONL.
-- **Cache write rate** — `cache_write_per_mtok` column on rate card. Anthropic
-  charges 1.25x input rate for cache writes; other providers charge 1.0x.
-- **README.md** — full documentation with install, quick start, features,
-  CLI reference, and architecture overview.
+  counts from Claude Code session transcripts.
+- **Spend forecasting** — `agentmeter forecast` projects monthly spend.
+- **Spend advisory** — `agentmeter advise` with project filtering (`-p`).
+- **Strategy command** — `agentmeter strategy` per-project cost analysis
+  with cache efficiency, savings, and recommendations.
+- **Summary command** — `agentmeter summary` for agent context injection.
+- **Session outcomes** — commits, files changed, and test results tracking.
+- **Data export** — `agentmeter export` outputs JSONL.
+- **Cache write rate** — separate cache write pricing on rate card.
 
 ### Changed
-- **Licence field** in pyproject.toml corrected from MIT to Apache-2.0
-  (matching the actual LICENSE file).
+- All features now ship in the package — no pro/free tier split.
+- Agent-agnostic advice — no platform-specific recommendations.
+- Licence field corrected to Apache-2.0.
 
 ## [0.4.0] — Multi-Agent Foundation
 

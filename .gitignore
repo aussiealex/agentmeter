@@ -16,14 +16,15 @@ build/
 .specify/
 .claude/
 CLAUDE.md
-specs/
 designs/
 dashboard/
 reports/
 PROJECT_BRIEF.md
 ARCHITECTURE.md
 wrap-mailsift.sh
-
-# Tests and CI (not shipped)
-tests/
-.github/
+specs/
+tests/TEST_STRATEGY.md
+hosting/
+release-problem.md
+releaseSolution1.md
+releaseSolution1a.md

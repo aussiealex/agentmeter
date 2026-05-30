@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-usage"
-version = "0.1.1"
-description = "The missing economics layer for MCP agents. Meter every tool call."
+version = "0.2.0"
+description = "Know what your agents cost. Cost intelligence for AI coding agents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -22,21 +22,6 @@ agentmeter = "agentmeter.cli:main"
 packages = ["src/agentmeter"]
 
 [tool.hatch.build.targets.wheel.force-include]
-
-[tool.hatch.build]
-exclude = [
-    "src/agentmeter/cli_cost.py",
-    "src/agentmeter/cli_forecast.py",
-    "src/agentmeter/cli_advise.py",
-    "src/agentmeter/cli_strategy.py",
-    "src/agentmeter/cli_summary.py",
-    "src/agentmeter/cli_export.py",
-    "src/agentmeter/cli_dashboard.py",
-    "src/agentmeter/session_reader.py",
-    "src/agentmeter/heuristics.py",
-    "src/agentmeter/cli_coach.py",
-    "src/agentmeter/web/",
-]
 
 [project.optional-dependencies]
 dev = [

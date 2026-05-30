@@ -1,3 +1,3 @@
-"""AgentMeter — the missing economics layer for MCP agents."""
+"""AgentMeter — know what your agents cost."""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"

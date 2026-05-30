@@ -2,23 +2,33 @@
 
 **Know what your agents cost.**
 
-AgentMeter is the universal metering layer for AI coding agents. It captures
-every tool call — whether through agent hooks or an MCP proxy — and gives you
-tool call analytics, budget enforcement, and cost visibility.
+AgentMeter is the cost intelligence layer for AI coding agents. It captures
+every tool call, tracks real token costs, analyses caching efficiency, and
+coaches you on reducing spend.
 
-Works with **Claude Code**, **Gemini CLI**, **Codex CLI**, **Copilot CLI**,
-and any MCP-compatible agent. Runs entirely on your machine. No cloud, no
-accounts, no signup.
+Built for **Claude Code**. Also supports Gemini CLI, Codex CLI, and
+Copilot CLI. Runs entirely on your machine. No cloud, no accounts, no signup.
 
 ## Why
 
 AI coding agents are powerful, but they're expensive and opaque. A single
 session can burn through $50+ in API costs, and you won't know until the
-bill arrives.
+bill arrives. Prompt caching splits costs into three token types at three
+different rates. Your API dashboard shows per-request numbers. AgentMeter
+shows you the real picture.
 
-AgentMeter sits at the tool boundary (what agents *do*, not what they
-*think*) and gives you visibility into every tool call, every session,
-every project.
+```
+$ agentmeter cost
+
+  ProjectX  —  $19.17  (4,982,859 tokens, 83 LLM calls)
+  ──────────────────────────────────────────────────────────────
+    Cache reads:        4,358,360  (87%)
+    Cache creation:       592,819  (12%)
+    Output:                17,284  (0.3%)
+    Input:                 14,396  (0.3%)
+    Cache efficiency: 88%
+    Cache saved:     $58.84 (75%)
+```
 
 ## Quick Start
 
@@ -61,25 +71,60 @@ $ agentmeter stats
   Grep                 ██████                  89 calls
 ```
 
-```
-$ agentmeter daily
-
-  Daily Totals (last 7 days)
-  ──────────────────────────────────────────────────────
-  2026-05-14  ███████████          383 calls
-  2026-05-15  █████████████████    718 calls
-  2026-05-16  █████████████████    847 calls
-  2026-05-17  ██████████████████   773 calls
-  2026-05-18  █████████████████    742 calls
-  2026-05-19  ██████████           340 calls
-  2026-05-20  ████████████         419 calls
-```
-
 ## Features
 
-### Tool Call Stats
+### Cost Analysis
 
-Track every tool call across all your agents and projects:
+Real token costs from Claude Code session transcripts — not estimates:
+
+```bash
+agentmeter cost               # recent sessions with token breakdown
+agentmeter cost <session-id>  # detailed breakdown (partial ID works)
+agentmeter forecast           # monthly spend projection
+agentmeter strategy           # per-project cost analysis + advice
+```
+
+Cache intelligence is built in. Every cost view shows cache efficiency
+(how well prompt caching is working) and cache savings (dollars saved
+vs uncached).
+
+### Session Coaching
+
+Analyses tool call patterns and gives actionable advice:
+
+```bash
+agentmeter coach review              # review most recent session
+agentmeter coach review -p myproject # review by project name
+agentmeter advise                    # cross-session spend analysis
+```
+
+```
+$ agentmeter coach review -p myproject
+
+  Session Review — MyProject
+  2026-05-28 14:03
+  ───────────────────────────────────────────────────────
+  131 tool calls  $68.98
+
+    Bash                  █████    39 (30%)
+    Edit                  █████    34 (26%)
+    Read                  ███    22 (17%)
+
+  Outcome: 2 commits, 27 files changed, 1188 tests passed
+
+  Efficiency: 8/10
+
+  Patterns detected:
+   ! Grep+Glob called 16x (Grep 12, Glob 4)
+     Tell the agent what you're looking for and where.
+     Read 17 unique files
+     You're exploring broadly. Invest 2 min writing which files matter.
+```
+
+Detects 13 patterns including edit-test loops, broad exploration, repeated
+file reads, high velocity bursts, cache write waste, and low cache efficiency.
+
+### Tool Call Stats
 
 ```bash
 agentmeter stats              # today's stats
@@ -113,40 +158,43 @@ agentmeter breaker set 20 60     # trip after 20 calls in 60 seconds
 agentmeter breaker set 10 30 -c 600  # custom cooldown (600s)
 ```
 
+### Web Dashboard
+
+```bash
+agentmeter dashboard          # open at localhost:8070
+```
+
+Six views: overview, projects with cost split, sessions, daily trends,
+rate card, and strategy recommendations.
+
+### Agent Context Injection
+
+Generate a cost summary your agent can read at session start:
+
+```bash
+agentmeter summary                    # all projects
+agentmeter summary -p myproject       # project-specific
+agentmeter summary >> CLAUDE.md       # inject into agent context
+```
+
 ### MCP Proxy
 
 If you run MCP servers, AgentMeter can sit between your agent and the server
-as a transparent proxy — metering every MCP tool call without changing either
-side:
+as a transparent proxy:
 
 ```bash
 agentmeter wrap python -m some.mcp.server
 agentmeter wrap --name myserver python -m some.mcp.server
 ```
 
-In your agent's `.mcp.json`, just prefix the command:
-
-```json
-{
-  "mcpServers": {
-    "myserver": {
-      "command": "agentmeter",
-      "args": ["wrap", "--name", "myserver", "python", "-m", "some.mcp.server"]
-    }
-  }
-}
-```
-
 Hook data and proxy data feed the same database — built-in tools and MCP
 tools in one view.
 
-### Rate Card
-
-View and customise per-model pricing for cost estimation:
+### Data Export
 
 ```bash
-agentmeter rates              # view all rates
-agentmeter rates set <model>  # edit a model's rates
+agentmeter export                                    # JSONL to stdout
+agentmeter export --tool Read --since 2026-05-01     # filtered
 ```
 
 ## How It Works
@@ -161,10 +209,6 @@ Path 2: MCP Proxy (for metering MCP server traffic)
   Agent -> AgentMeter proxy -> MCP Server -> SQLite DB
 ```
 
-The hook path is the primary product. It captures built-in tool calls (Read,
-Edit, Bash, etc.) with zero config changes to your agent. The MCP proxy is
-the advanced path for metering MCP server traffic.
-
 ### Architecture
 
 - **Local-first** — SQLite with WAL mode, works offline, no cloud dependency
@@ -176,22 +220,10 @@ the advanced path for metering MCP server traffic.
 
 | Agent | Hook Type | Status |
 |-------|-----------|--------|
-| Claude Code | PostToolUse | Full support |
-| Gemini CLI | AfterTool | Full support |
-| Codex CLI | PostToolUse | Full support |
-| Copilot CLI | postToolUse | Full support |
-
-## AgentMeter Pro
-
-For teams and power users who need deeper cost intelligence:
-
-- **Real token cost analysis** — actual API costs from session transcripts
-- **Web dashboard** — visual overview of spend across projects and sessions
-- **Spend forecasting** — projected monthly costs based on usage patterns
-- **Strategy recommendations** — actionable advice to reduce agent spend
-- **Data export** — JSONL export for external analysis
-
-Contact: [coming soon]
+| Claude Code | PostToolUse | Full support (primary) |
+| Gemini CLI | AfterTool | Adapter built, untested in production |
+| Codex CLI | PostToolUse | Adapter built, untested in production |
+| Copilot CLI | postToolUse | Adapter built, untested in production |
 
 ## CLI Reference
 
@@ -201,6 +233,14 @@ Contact: [coming soon]
 | `agentmeter calls` | Recent individual calls |
 | `agentmeter sessions` | Session breakdowns with outcomes |
 | `agentmeter daily` | Daily totals with bar chart |
+| `agentmeter cost` | Real token costs per session |
+| `agentmeter forecast` | Monthly spend projection |
+| `agentmeter strategy` | Per-project cost analysis + advice |
+| `agentmeter advise` | Cross-session spend recommendations |
+| `agentmeter coach review` | Single-session efficiency analysis |
+| `agentmeter summary` | Cost context for agent injection |
+| `agentmeter dashboard` | Web dashboard |
+| `agentmeter export` | JSONL data export |
 | `agentmeter budget` | Budget rules (set/show/clear) |
 | `agentmeter breaker` | Circuit breakers (set/show/clear) |
 | `agentmeter hook` | Hook management (install/status) |
