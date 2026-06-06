@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import click
 
 from agentmeter.db import MeterDB
+from agentmeter.heuristics import AnalysisContext, Finding, analyse_cross_session
 from agentmeter.platform import project_name
 from agentmeter.session_reader import (
     calculate_session_cost,
@@ -24,7 +25,11 @@ from agentmeter.session_reader import (
     "--project", "-p", default=None,
     help="Filter to a specific project.",
 )
-def summary(days: int, project: str | None) -> None:
+@click.option(
+    "--directives/--no-directives", default=True,
+    help="Include coaching directives from heuristics.",
+)
+def summary(days: int, project: str | None, directives: bool) -> None:
     """Output a compact cost summary for agent context injection.
 
     Designed to be read by AI agents at session start. Output is
@@ -72,6 +77,16 @@ def summary(days: int, project: str | None) -> None:
             tests_failed=s.tests_failed,
         ))
 
+    # Run heuristics for directives before closing DB
+    findings: list[Finding] = []
+    if directives:
+        ctx = AnalysisContext(
+            conn=db._conn,
+            since=since,
+            project=project,
+        )
+        findings = analyse_cross_session(ctx)
+
     db.close()
 
     if not entries:
@@ -79,6 +94,9 @@ def summary(days: int, project: str | None) -> None:
         return
 
     _print_summary(entries, days, project)
+
+    if directives and findings:
+        _print_directives(findings)
 
 
 class _Entry:
@@ -206,3 +224,53 @@ def _print_summary(
         for name, cost in sorted_projs[:5]:
             pct = (cost / total_cost * 100) if total_cost else 0
             click.echo(f"#   {name}: ${cost:.2f} ({pct:.0f}%)")
+
+
+def _finding_to_directive(f: Finding) -> str | None:
+    """Convert a heuristic Finding into a short imperative directive."""
+    d = f.data
+    if f.pattern == "repeated_file_cross_session":
+        name = d.get("display_name", d.get("file", "?"))
+        if d.get("is_written") or d.get("is_volatile"):
+            return f"Read {name} once per session, not repeatedly."
+        return f"Don't re-read {name} — inline or summarise it."
+
+    if f.pattern == "binary_image_reads":
+        name = d.get("file", "?").rsplit("/", 1)[-1]
+        return f"Describe {name} in text instead of reading the image."
+
+    if f.pattern == "session_size_outlier":
+        avg = d.get("project_avg", 0)
+        if avg > 0:
+            target = max(int(avg * 1.5), 60)
+            return f"Keep sessions under {target} tool calls."
+        return None
+
+    if f.pattern == "project_concentration":
+        proj = d.get("project", "?")
+        pct = d.get("ratio", 0)
+        return (
+            f"{proj} is {pct:.0%} of all agent time — "
+            f"check this matches your priorities."
+        )
+
+    return None
+
+
+def _print_directives(findings: list[Finding]) -> None:
+    """Emit up to 3 imperative coaching directives from findings."""
+    directives: list[str] = []
+    for f in findings:
+        d = _finding_to_directive(f)
+        if d and d not in directives:
+            directives.append(d)
+        if len(directives) >= 3:
+            break
+
+    if not directives:
+        return
+
+    click.echo("#")
+    click.echo("# Directives:")
+    for d in directives:
+        click.echo(f"#   - {d}")
