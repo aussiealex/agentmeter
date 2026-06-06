@@ -35,6 +35,7 @@ def _load_pro_commands() -> None:
         from agentmeter.cli_dashboard import dashboard
         from agentmeter.cli_export import export
         from agentmeter.cli_forecast import forecast
+        from agentmeter.cli_model import model
         from agentmeter.cli_strategy import strategy
         from agentmeter.cli_summary import summary
 
@@ -44,6 +45,7 @@ def _load_pro_commands() -> None:
         main.add_command(dashboard)
         main.add_command(export)
         main.add_command(forecast)
+        main.add_command(model)
         main.add_command(strategy)
         main.add_command(summary)
     except ImportError:
