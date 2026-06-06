@@ -6,6 +6,7 @@ This module handles session creation and tool call recording.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import datetime
@@ -50,6 +51,40 @@ def record_event(event: NormalisedToolEvent) -> None:
         print(f"agentmeter: hook error: {exc}", file=sys.stderr, flush=True)
     finally:
         db.close()
+
+    # Update coach state file for yellow card tracking
+    _update_coach_state(event)
+
+
+def _update_coach_state(event: NormalisedToolEvent) -> None:
+    """Increment the coach state file for this session.
+
+    <1ms: read JSON, bump counters, write JSON. No DB queries.
+    """
+    try:
+        from agentmeter.platform import data_dir
+
+        coach_dir = data_dir() / "coach"
+        state_path = coach_dir / f"{event.session_id}.json"
+
+        state: dict = {}
+        if state_path.exists():
+            state = json.loads(state_path.read_text())
+
+        state["calls"] = state.get("calls", 0) + 1
+        tools = state.get("tools", {})
+        tools[event.tool_name] = tools.get(event.tool_name, 0) + 1
+        state["tools"] = tools
+        state["last_tool_at"] = event.timestamp
+        if "started_at" not in state:
+            state["started_at"] = event.timestamp
+        if "warnings_fired" not in state:
+            state["warnings_fired"] = []
+
+        coach_dir.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(state))
+    except Exception:
+        pass  # Never block the agent for coaching
 
 
 def extract_project(cwd: str) -> str:

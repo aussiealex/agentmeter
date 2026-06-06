@@ -52,51 +52,84 @@ def hook() -> None:
 
 @hook.command("install")
 @click.argument("agent", type=click.Choice(AGENTS), default="claude")
-def hook_install(agent: str) -> None:
+@click.option(
+    "--coach", "include_coach", is_flag=True, default=False,
+    help="Include PreToolUse coach hook for yellow card coaching.",
+)
+def hook_install(agent: str, include_coach: bool) -> None:
     """Print hook configuration for an agent.
 
     Generates the config snippet to add to the agent's settings file.
+    Use --coach to include the yellow card PreToolUse hook.
 
     Examples:
         agentmeter hook install claude
+        agentmeter hook install claude --coach
         agentmeter hook install gemini
-        agentmeter hook install codex
-        agentmeter hook install copilot
     """
     cfg = _AGENT_CONFIG[agent]
     python_path = shutil.which("python3") or shutil.which("python") or sys.executable
     command = f"{python_path} -m {cfg['module']}"
+    coach_command = f"{python_path} -m agentmeter.hooks.coach"
 
     if cfg["format"] == "json":
-        _print_json_config(agent, cfg, command)
+        coach = coach_command if include_coach else None
+        _print_json_config(agent, cfg, command, coach)
     elif cfg["format"] == "toml":
         _print_toml_config(agent, cfg, command)
+        if include_coach:
+            click.echo(
+                "\n# Coach hook (PreToolUse)"
+                " — not yet supported for TOML agents.",
+            )
     elif cfg["format"] == "copilot-json":
         _print_copilot_config(agent, cfg, command)
+        if include_coach:
+            click.echo("\n# Coach hook — not yet supported for Copilot.")
 
 
-def _print_json_config(agent: str, cfg: dict, command: str) -> None:
+def _print_json_config(
+    agent: str, cfg: dict, command: str,
+    coach_command: str | None = None,
+) -> None:
     """Print JSON hook config for Claude Code or Gemini CLI."""
-    config = {
-        "hooks": {
-            cfg["event"]: [
-                {
-                    "matcher": "*",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": command,
-                            "timeout": 2000,
-                        },
-                    ],
-                },
-            ],
-        },
+    hooks = {
+        cfg["event"]: [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": command,
+                        "timeout": 2000,
+                    },
+                ],
+            },
+        ],
     }
+
+    if coach_command:
+        hooks["PreToolUse"] = [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": coach_command,
+                        "timeout": 2000,
+                    },
+                ],
+            },
+        ]
+
+    config = {"hooks": hooks}
     click.echo(f"Add this to {cfg['config_file']}:\n")
     click.echo(_json.dumps(config, indent=2))
+    events = cfg["event"]
+    if coach_command:
+        events += " and PreToolUse"
     click.echo(
-        f"\nOr merge the {cfg['event']} array into your existing hooks config."
+        f"\nOr merge the {events} array(s) into your existing hooks config.",
     )
 
 

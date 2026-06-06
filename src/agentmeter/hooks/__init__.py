@@ -9,4 +9,5 @@ Entry points:
     python3 -m agentmeter.hooks.gemini    # Gemini CLI AfterTool (future)
     python3 -m agentmeter.hooks.codex     # Codex CLI PostToolUse (future)
     python3 -m agentmeter.hooks.copilot   # Copilot CLI postToolUse (future)
+    python3 -m agentmeter.hooks.coach     # PreToolUse yellow card coaching
 """
