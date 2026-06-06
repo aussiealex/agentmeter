@@ -100,18 +100,25 @@ def get_session_stats(
 
 def get_daily_totals(
     conn: sqlite3.Connection, days: int = 7,
+    project: str | None = None,
 ) -> list[DailyTotal]:
     """Get daily call counts and elapsed time."""
     since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    clauses = ["created_at >= ?"]
+    params: list = [since]
+    if project:
+        clauses.append("project = ?")
+        params.append(project)
+    where = build_where(clauses)
     rows = conn.execute(
         "SELECT DATE(created_at) as day, "
         "COUNT(*) as call_count, "
         "SUM(is_error) as error_count, "
         "SUM(elapsed_ms) as total_elapsed_ms "
-        "FROM tool_call WHERE created_at >= ? "
+        "FROM tool_call " + where + " "
         "GROUP BY DATE(created_at) "
         "ORDER BY day",
-        (since,),
+        params,
     ).fetchall()
 
     return [

@@ -59,8 +59,9 @@ def get_tool_stats(
     conn: sqlite3.Connection,
     since: str | None = None,
     server_name: str | None = None,
+    project: str | None = None,
 ) -> list[ToolStats]:
-    """Get aggregated stats per tool, optionally filtered by time and server."""
+    """Get aggregated stats per tool, optionally filtered."""
     clauses: list[str] = []
     params: list[str] = []
 
@@ -70,6 +71,9 @@ def get_tool_stats(
     if server_name:
         clauses.append("server_name = ?")
         params.append(server_name)
+    if project:
+        clauses.append("project = ?")
+        params.append(project)
 
     where = build_where(clauses)
 
@@ -104,6 +108,8 @@ def get_recent_calls(
     conn: sqlite3.Connection,
     limit: int = 50,
     tool_name: str | None = None,
+    project: str | None = None,
+    since: str | None = None,
 ) -> list[ToolCall]:
     """Get recent individual tool calls."""
     clauses: list[str] = []
@@ -112,6 +118,12 @@ def get_recent_calls(
     if tool_name:
         clauses.append("tool_name = ?")
         params.append(tool_name)
+    if project:
+        clauses.append("project = ?")
+        params.append(project)
+    if since:
+        clauses.append("created_at >= ?")
+        params.append(since)
 
     where = build_where(clauses)
     params.append(limit)
@@ -132,6 +144,7 @@ def get_calls_for_export(
     tool_name: str | None = None,
     session_id: str | None = None,
     limit: int | None = None,
+    project: str | None = None,
 ) -> list[ToolCall]:
     """Get tool calls for JSONL export, with optional filters."""
     clauses: list[str] = []
@@ -146,6 +159,9 @@ def get_calls_for_export(
     if session_id:
         clauses.append("session_id = ?")
         params.append(session_id)
+    if project:
+        clauses.append("project = ?")
+        params.append(project)
 
     where = build_where(clauses)
     query = "SELECT * FROM tool_call " + where + " ORDER BY created_at ASC"

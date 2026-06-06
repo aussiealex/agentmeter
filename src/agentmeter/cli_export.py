@@ -20,11 +20,16 @@ from agentmeter.db import MeterDB
     "--limit", "-l", default=None, type=int,
     help="Maximum number of calls to export.",
 )
+@click.option(
+    "--project", "-p", default=None,
+    help="Filter by project name.",
+)
 def export(
     since: str | None,
     tool: str | None,
     session: str | None,
     limit: int | None,
+    project: str | None,
 ) -> None:
     """Export tool call data as JSONL (one JSON object per line).
 
@@ -42,6 +47,7 @@ def export(
         tool_name=tool,
         session_id=session,
         limit=limit,
+        project=project,
     )
     db.close()
 

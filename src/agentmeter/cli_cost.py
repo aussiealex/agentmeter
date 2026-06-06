@@ -21,7 +21,11 @@ from agentmeter.session_reader import (
     "--limit", "-l", default=5,
     help="Number of recent sessions to show if no session_id given.",
 )
-def cost(session_id: str | None, limit: int) -> None:
+@click.option(
+    "--project", "-p", default=None,
+    help="Filter by project name.",
+)
+def cost(session_id: str | None, limit: int, project: str | None) -> None:
     """Show real token usage and cost for a session.
 
     If SESSION_ID is given, shows detailed cost for that session.
@@ -39,7 +43,7 @@ def cost(session_id: str | None, limit: int) -> None:
     if session_id:
         _show_session_cost(db, session_id)
     else:
-        _show_recent_costs(db, limit)
+        _show_recent_costs(db, limit, project)
 
     db.close()
 
@@ -152,16 +156,26 @@ def _show_session_cost(db: MeterDB, session_id: str) -> None:
     click.echo()
 
 
-def _show_recent_costs(db: MeterDB, limit: int) -> None:
+def _show_recent_costs(
+    db: MeterDB, limit: int,
+    project: str | None = None,
+) -> None:
     """Show detailed cost breakdown for recent sessions."""
-    sessions = db.get_sessions(limit=limit)
+    sessions = db.get_sessions(limit=limit * 3 if project else limit)
 
     if not sessions:
         click.echo("\n  No sessions recorded.\n")
         return
 
     any_cost = False
+    shown = 0
     for session in sessions:
+        if project:
+            proj = project_name(session.server_command)
+            if project.lower() not in proj.lower():
+                continue
+        if shown >= limit:
+            break
         jsonl_path = find_session_jsonl(
             session.id, session.server_command,
         )
@@ -255,6 +269,7 @@ def _show_recent_costs(db: MeterDB, limit: int) -> None:
             )
 
         any_cost = True
+        shown += 1
 
     if not any_cost:
         click.echo()

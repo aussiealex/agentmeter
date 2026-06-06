@@ -75,10 +75,16 @@ def wrap(command: str, args: tuple[str, ...], name: str) -> None:
 @click.option("--all", "period", flag_value="all", help="Show all-time stats.")
 @click.option("--server", "-s", default=None, help="Filter by server name.")
 @click.option(
+    "--project", "-p", default=None, help="Filter by project name.",
+)
+@click.option(
     "--distribution", is_flag=True, default=False,
     help="Show per-server session percentiles (p50/p90/p99).",
 )
-def stats(period: str | None, server: str | None, distribution: bool) -> None:
+def stats(
+    period: str | None, server: str | None,
+    project: str | None, distribution: bool,
+) -> None:
     """Show aggregated tool call statistics."""
     db = MeterDB()
 
@@ -96,7 +102,9 @@ def stats(period: str | None, server: str | None, distribution: bool) -> None:
         # Default to today
         since = datetime.now().strftime("%Y-%m-%d")
 
-    tool_stats = db.get_tool_stats(since=since, server_name=server)
+    tool_stats = db.get_tool_stats(
+        since=since, server_name=server, project=project,
+    )
     total_calls = sum(t.call_count for t in tool_stats)
     total_errors = sum(t.error_count for t in tool_stats)
     total_time_ms = sum(t.total_elapsed_ms for t in tool_stats)
@@ -127,10 +135,15 @@ def stats(period: str | None, server: str | None, distribution: bool) -> None:
 
 @main.command()
 @click.option("--limit", "-l", default=10, help="Number of sessions to show.")
-def sessions(limit: int) -> None:
+@click.option(
+    "--project", "-p", default=None, help="Filter by project name.",
+)
+def sessions(limit: int, project: str | None) -> None:
     """Show recent sessions with tool breakdowns and outcomes."""
+    from agentmeter.platform import project_name
+
     db = MeterDB()
-    session_stats = db.get_session_stats(limit=limit)
+    session_stats = db.get_session_stats(limit=limit if not project else limit * 3)
 
     if not session_stats:
         click.echo("\n  No sessions recorded.\n")
@@ -138,10 +151,25 @@ def sessions(limit: int) -> None:
         return
 
     # Build outcome lookup from session table
-    raw_sessions = db.get_sessions(limit=limit * 2)
+    raw_sessions = db.get_sessions(
+        limit=limit * 3 if project else limit * 2,
+    )
     outcomes = {s.id: s for s in raw_sessions}
 
+    shown = 0
     for ss in session_stats:
+        # Project filter: match against session's server_command
+        if project:
+            s = outcomes.get(ss.session_id)
+            if s:
+                proj = project_name(s.server_command)
+                if project.lower() not in proj.lower():
+                    continue
+            else:
+                continue
+        if shown >= limit:
+            break
+        shown += 1
         click.echo()
         click.echo(f"  Session: {ss.session_name} ({ss.server_name})")
         click.echo(f"  Started: {ss.started_at}")
@@ -196,10 +224,13 @@ def backfill() -> None:
 
 @main.command()
 @click.option("--days", "-d", default=7, help="Number of days to show.")
-def daily(days: int) -> None:
+@click.option(
+    "--project", "-p", default=None, help="Filter by project name.",
+)
+def daily(days: int, project: str | None) -> None:
     """Show daily call totals with cost when available."""
     db = MeterDB()
-    totals = db.get_daily_totals(days=days)
+    totals = db.get_daily_totals(days=days, project=project)
 
     if not totals:
         click.echo("\n  No data for this period.\n")
@@ -209,6 +240,7 @@ def daily(days: int) -> None:
     # Build daily cost map from real token data (pro feature)
     daily_costs: dict[str, float] = {}
     try:
+        from agentmeter.platform import project_name as _pname
         from agentmeter.session_reader import (
             calculate_session_cost,
             find_session_jsonl,
@@ -217,6 +249,10 @@ def daily(days: int) -> None:
 
         sessions = db.get_sessions(limit=200)
         for session in sessions:
+            if project:
+                proj = _pname(session.server_command)
+                if project.lower() not in proj.lower():
+                    continue
             jsonl_path = find_session_jsonl(session.id, session.server_command)
             if not jsonl_path:
                 continue
@@ -280,11 +316,24 @@ def rename(session_id: str, name: str) -> None:
 @main.command()
 @click.option("--limit", "-l", default=20, help="Number of calls to show.")
 @click.option("--tool", "-t", default=None, help="Filter by tool name.")
-def calls(limit: int, tool: str | None) -> None:
+@click.option(
+    "--project", "-p", default=None, help="Filter by project name.",
+)
+@click.option(
+    "--since", "-s", default=None,
+    help="Only calls after this date (YYYY-MM-DD).",
+)
+def calls(
+    limit: int, tool: str | None,
+    project: str | None, since: str | None,
+) -> None:
     """Show recent individual tool calls."""
     db = MeterDB()
     from agentmeter.cli_format import format_bytes
-    recent = db.get_recent_calls(limit=limit, tool_name=tool)
+    recent = db.get_recent_calls(
+        limit=limit, tool_name=tool,
+        project=project, since=since,
+    )
 
     if not recent:
         click.echo("\n  No tool calls recorded.\n")

@@ -19,7 +19,11 @@ from agentmeter.session_reader import (
     "--days", "-d", default=7,
     help="Days of history to base forecast on (default: 7).",
 )
-def forecast(days: int) -> None:
+@click.option(
+    "--project", "-p", default=None,
+    help="Filter by project name.",
+)
+def forecast(days: int, project: str | None) -> None:
     """Forecast monthly spend from recent session costs.
 
     Reads real token data from recent Claude Code sessions, computes
@@ -43,9 +47,15 @@ def forecast(days: int) -> None:
     daily_costs: dict[str, float] = {}
     session_count = 0
 
+    from agentmeter.platform import project_name
+
     for session in sessions:
         if session.started_at < cutoff:
             continue
+        if project:
+            proj = project_name(session.server_command)
+            if project.lower() not in proj.lower():
+                continue
 
         jsonl_path = find_session_jsonl(session.id, session.server_command)
         if not jsonl_path:

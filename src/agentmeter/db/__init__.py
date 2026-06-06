@@ -91,15 +91,22 @@ class MeterDB:
         self,
         since: str | None = None,
         server_name: str | None = None,
+        project: str | None = None,
     ) -> list[ToolStats]:
-        return calls.get_tool_stats(self._conn, since, server_name)
+        return calls.get_tool_stats(
+            self._conn, since, server_name, project,
+        )
 
     def get_recent_calls(
         self,
         limit: int = 50,
         tool_name: str | None = None,
+        project: str | None = None,
+        since: str | None = None,
     ) -> list[ToolCall]:
-        return calls.get_recent_calls(self._conn, limit, tool_name)
+        return calls.get_recent_calls(
+            self._conn, limit, tool_name, project, since,
+        )
 
     def get_total_calls(self, since: str | None = None) -> int:
         return calls.get_total_calls(self._conn, since)
@@ -110,9 +117,11 @@ class MeterDB:
         tool_name: str | None = None,
         session_id: str | None = None,
         limit: int | None = None,
+        project: str | None = None,
     ) -> list[ToolCall]:
         return calls.get_calls_for_export(
             self._conn, since, tool_name, session_id, limit,
+            project,
         )
 
     # ── Budget operations ───────────────────────────────────────────
@@ -184,8 +193,10 @@ class MeterDB:
     ) -> list[SessionStats]:
         return analytics.get_session_stats(self._conn, since, limit)
 
-    def get_daily_totals(self, days: int = 7) -> list[DailyTotal]:
-        return analytics.get_daily_totals(self._conn, days)
+    def get_daily_totals(
+        self, days: int = 7, project: str | None = None,
+    ) -> list[DailyTotal]:
+        return analytics.get_daily_totals(self._conn, days, project)
 
     def get_session_distribution(
         self,
