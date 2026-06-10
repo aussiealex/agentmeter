@@ -65,7 +65,8 @@ def get_sessions(
     rows = conn.execute(
         "SELECT id, name, server_name, server_command, started_at, "
         "ended_at, total_calls, commits, files_changed, "
-        "tests_passed, tests_failed FROM session "
+        "tests_passed, tests_failed, lint_passes, lint_errors, "
+        "retries, errors FROM session "
         "ORDER BY started_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
@@ -85,6 +86,26 @@ def update_session_outcome(
         "UPDATE session SET commits = ?, files_changed = ?, "
         "tests_passed = ?, tests_failed = ? WHERE id = ?",
         (commits, files_changed, tests_passed, tests_failed,
+         session_id),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+def update_session_quality(
+    conn: sqlite3.Connection,
+    session_id: str,
+    lint_passes: int,
+    lint_errors: int,
+    retries: int,
+    errors: int,
+    total_calls: int,
+) -> bool:
+    """Update session with quality tracking data. Returns True if found."""
+    cursor = conn.execute(
+        "UPDATE session SET lint_passes = ?, lint_errors = ?, "
+        "retries = ?, errors = ?, total_calls = ? WHERE id = ?",
+        (lint_passes, lint_errors, retries, errors, total_calls,
          session_id),
     )
     conn.commit()
@@ -113,6 +134,10 @@ def _row_to_session(r: sqlite3.Row) -> Session:
         tests_passed=tests_passed,
         tests_failed=tests_failed,
         outcome=outcome,
+        lint_passes=r["lint_passes"],
+        lint_errors=r["lint_errors"],
+        retries=r["retries"],
+        errors=r["errors"],
     )
 
 

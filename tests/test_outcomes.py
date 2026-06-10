@@ -14,6 +14,8 @@ from agentmeter.models import Session, ToolCall
 from agentmeter.outcomes import (
     _count_commits,
     _count_files_changed,
+    _normalise_cmd,
+    _parse_lint_results,
     _parse_test_results,
     detect_session_outcome,
 )
@@ -95,6 +97,63 @@ class TestParseTestResults:
         assert passed == 245
 
 
+# ── Lint detection ──────────────────────────────────────────
+
+
+class TestParseLintResults:
+    def test_ruff_clean(self) -> None:
+        lp, le = _parse_lint_results(
+            "ruff check src/", "All checks passed!", False,
+        )
+        assert lp == 1
+        assert le == 0
+
+    def test_ruff_errors(self) -> None:
+        lp, le = _parse_lint_results(
+            "ruff check src/", "Found 3 errors.", True,
+        )
+        assert lp == 0
+        assert le == 1
+
+    def test_eslint_clean(self) -> None:
+        lp, le = _parse_lint_results(
+            "eslint .", "no problems found", False,
+        )
+        assert lp == 1
+        assert le == 0
+
+    def test_mypy_error(self) -> None:
+        lp, le = _parse_lint_results(
+            "mypy src/", "error: Incompatible types", False,
+        )
+        assert lp == 0
+        assert le == 1
+
+    def test_non_lint_command_ignored(self) -> None:
+        lp, le = _parse_lint_results(
+            "git status", "All checks passed!", False,
+        )
+        assert lp == 0
+        assert le == 0
+
+    def test_lint_no_clear_signal_counts_pass(self) -> None:
+        lp, le = _parse_lint_results(
+            "ruff check src/", "", False,
+        )
+        assert lp == 1
+        assert le == 0
+
+
+class TestNormaliseCmd:
+    def test_strips_whitespace(self) -> None:
+        assert _normalise_cmd("  git  commit  -m 'x'  ") == "git commit -m 'x'"
+
+    def test_identical_commands_match(self) -> None:
+        a = _normalise_cmd("python3 -m pytest tests/ -v")
+        b = _normalise_cmd("python3  -m  pytest  tests/  -v")
+        assert a == b
+
+
 # ── Integration: detect_session_outcome ──────────────────────
 
 
@@ -165,6 +224,8 @@ class TestDetectSessionOutcome:
         assert facts["files_changed"] == 3
         assert facts["tests_passed"] == 257
         assert facts["tests_failed"] == 0
+        assert facts["total_calls"] == 3
+        assert facts["errors"] == 0
         db.close()
 
     def test_empty_session(self, tmp_path: Path) -> None:
@@ -180,6 +241,7 @@ class TestDetectSessionOutcome:
         facts = detect_session_outcome(db, "sess-empty")
         assert facts["commits"] == 0
         assert facts["tests_passed"] == 0
+        assert facts["total_calls"] == 0
         db.close()
 
     def test_failed_tests(self, tmp_path: Path) -> None:
@@ -205,6 +267,57 @@ class TestDetectSessionOutcome:
         facts = detect_session_outcome(db, "sess-fail")
         assert facts["tests_passed"] == 240
         assert facts["tests_failed"] == 5
+        db.close()
+
+    def test_detects_lint(self, tmp_path: Path) -> None:
+        db = MeterDB(tmp_path / "lint.db")
+        session = Session(
+            id="sess-lint",
+            server_name="claude-code",
+            server_command="/path",
+            started_at=datetime.now().isoformat(),
+        )
+        db.create_session(session)
+        db.record_call(ToolCall(
+            session_id="sess-lint",
+            server_name="claude-code",
+            tool_name="Bash",
+            arguments_json='{"command": "ruff check src/"}',
+            result_json="All checks passed!",
+            result_size=20,
+            started_at=datetime.now().isoformat(),
+            elapsed_ms=200,
+        ))
+        db.end_session("sess-lint", total_calls=1)
+        facts = detect_session_outcome(db, "sess-lint")
+        assert facts["lint_passes"] == 1
+        assert facts["lint_errors"] == 0
+        db.close()
+
+    def test_counts_errors(self, tmp_path: Path) -> None:
+        db = MeterDB(tmp_path / "err.db")
+        session = Session(
+            id="sess-err",
+            server_name="claude-code",
+            server_command="/path",
+            started_at=datetime.now().isoformat(),
+        )
+        db.create_session(session)
+        db.record_call(ToolCall(
+            session_id="sess-err",
+            server_name="claude-code",
+            tool_name="Bash",
+            arguments_json='{"command": "cat missing.txt"}',
+            result_json="No such file",
+            result_size=15,
+            is_error=True,
+            started_at=datetime.now().isoformat(),
+            elapsed_ms=10,
+        ))
+        db.end_session("sess-err", total_calls=1)
+        facts = detect_session_outcome(db, "sess-err")
+        assert facts["errors"] == 1
+        assert facts["total_calls"] == 1
         db.close()
 
 
@@ -299,3 +412,88 @@ class TestBackfillCommand:
         assert s.tests_passed == 257
         assert s.outcome == "tested+committed"
         db2.close()
+
+
+# ── Value multiplier ───────────────────────────────────────
+
+
+class TestValueMultiplier:
+    def test_estimate_dev_minutes(self) -> None:
+        from agentmeter.cli_value import estimate_dev_minutes
+
+        minutes = estimate_dev_minutes(
+            commits=2, tests_passed=50,
+            files_changed=5, lint_passes=3,
+        )
+        # 2*20 + 50*2 + 5*10 + 3*3 = 40+100+50+9 = 199
+        assert minutes == 199
+
+    def test_estimate_zero_outcomes(self) -> None:
+        from agentmeter.cli_value import estimate_dev_minutes
+
+        assert estimate_dev_minutes(0, 0, 0, 0) == 0
+
+    def test_estimate_dev_value(self) -> None:
+        from agentmeter.cli_value import estimate_dev_value
+
+        # 60 minutes at $150/hr = $150
+        assert estimate_dev_value(60, 150) == 150.0
+        # 30 minutes at $200/hr = $100
+        assert estimate_dev_value(30, 200) == 100.0
+
+    def test_quality_score_perfect(self) -> None:
+        from agentmeter.cli_value import quality_score
+
+        score = quality_score(
+            errors=0, total_calls=50,
+            tests_failed=0, retries=0, lint_errors=0,
+        )
+        assert score == 100
+
+    def test_quality_score_with_errors(self) -> None:
+        from agentmeter.cli_value import quality_score
+
+        score = quality_score(
+            errors=10, total_calls=50,
+            tests_failed=2, retries=3, lint_errors=1,
+        )
+        # 100 - 40(err 20%) - 10(2 fails) - 12(3 retries) - 5(1 lint)
+        assert score == 33
+
+    def test_quality_score_floors_at_zero(self) -> None:
+        from agentmeter.cli_value import quality_score
+
+        score = quality_score(
+            errors=50, total_calls=50,
+            tests_failed=20, retries=20, lint_errors=10,
+        )
+        assert score == 0
+
+    def test_value_cli_no_sessions(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["value"],
+            env={"AGENTMETER_DB": "/tmp/nonexistent_value_test.db"},
+        )
+        assert result.exit_code == 0
+
+
+class TestQualityStorage:
+    def test_store_and_retrieve_quality(self, tmp_path: Path) -> None:
+        db = MeterDB(tmp_path / "q.db")
+        session = Session(
+            id="s-q", server_name="test",
+            server_command="/p",
+            started_at=datetime.now().isoformat(),
+        )
+        db.create_session(session)
+        db.update_session_quality(
+            "s-q", lint_passes=3, lint_errors=1,
+            retries=2, errors=5, total_calls=50,
+        )
+        s = db.get_sessions(limit=1)[0]
+        assert s.lint_passes == 3
+        assert s.lint_errors == 1
+        assert s.retries == 2
+        assert s.errors == 5
+        db.close()

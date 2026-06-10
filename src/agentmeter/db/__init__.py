@@ -82,6 +82,20 @@ class MeterDB:
             commits, files_changed, tests_passed, tests_failed,
         )
 
+    def update_session_quality(
+        self,
+        session_id: str,
+        lint_passes: int,
+        lint_errors: int,
+        retries: int,
+        errors: int,
+        total_calls: int,
+    ) -> bool:
+        return sessions.update_session_quality(
+            self._conn, session_id,
+            lint_passes, lint_errors, retries, errors, total_calls,
+        )
+
     # ── Tool call operations ────────────────────────────────────────
 
     def record_call(self, call: ToolCall) -> None:

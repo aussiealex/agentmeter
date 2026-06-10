@@ -139,6 +139,11 @@ _SESSION_MIGRATIONS = [
     ("files_changed", "files_changed INTEGER NOT NULL DEFAULT 0"),
     ("tests_passed", "tests_passed INTEGER NOT NULL DEFAULT 0"),
     ("tests_failed", "tests_failed INTEGER NOT NULL DEFAULT 0"),
+    # Quality tracking (added 2026-06-10)
+    ("lint_passes", "lint_passes INTEGER NOT NULL DEFAULT 0"),
+    ("lint_errors", "lint_errors INTEGER NOT NULL DEFAULT 0"),
+    ("retries", "retries INTEGER NOT NULL DEFAULT 0"),
+    ("errors", "errors INTEGER NOT NULL DEFAULT 0"),
 ]
 
 _TOOL_CALL_MIGRATIONS = [

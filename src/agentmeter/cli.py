@@ -38,6 +38,7 @@ def _load_pro_commands() -> None:
         from agentmeter.cli_model import model
         from agentmeter.cli_strategy import strategy
         from agentmeter.cli_summary import summary
+        from agentmeter.cli_value import value
 
         main.add_command(advise)
         main.add_command(coach)
@@ -48,6 +49,7 @@ def _load_pro_commands() -> None:
         main.add_command(model)
         main.add_command(strategy)
         main.add_command(summary)
+        main.add_command(value)
     except ImportError:
         pass
 

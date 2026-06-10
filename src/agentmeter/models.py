@@ -43,6 +43,11 @@ class Session:
     tests_passed: int = 0
     tests_failed: int = 0
     outcome: str = ""  # derived: committed, tested, failed, no-output
+    # Quality tracking
+    lint_passes: int = 0
+    lint_errors: int = 0
+    retries: int = 0
+    errors: int = 0
 
 
 @dataclass
