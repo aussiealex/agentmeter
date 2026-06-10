@@ -9,6 +9,22 @@ description = "Know what your agents cost. Cost intelligence for AI coding agent
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+authors = [
+    { name = "Andre300", email = "agentmeter@proton.me" },
+]
+keywords = [
+    "ai", "agent", "cost", "metering", "claude", "mcp",
+    "gemini", "codex", "copilot", "llm", "token", "budget",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Monitoring",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "mcp>=1.0",
     "click>=8.0",
@@ -19,6 +35,7 @@ dependencies = [
 Homepage = "https://github.com/aussiealex/agentmeter"
 Repository = "https://github.com/aussiealex/agentmeter"
 Issues = "https://github.com/aussiealex/agentmeter/issues"
+Discussions = "https://github.com/aussiealex/agentmeter/discussions"
 
 [project.scripts]
 agentmeter = "agentmeter.cli:main"

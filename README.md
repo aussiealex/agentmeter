@@ -333,6 +333,16 @@ Most commands accept `-p/--project` to filter by project name.
 - Python 3.11+
 - No external services or API keys
 
+## Community
+
+If AgentMeter saves you money, [star the repo](https://github.com/aussiealex/agentmeter) — it helps others find it.
+
+- **Bug reports & feature requests:** [GitHub Issues](https://github.com/aussiealex/agentmeter/issues)
+- **Questions & discussion:** [GitHub Discussions](https://github.com/aussiealex/agentmeter/discussions)
+- **Contact:** agentmeter@proton.me
+
+Built by [Andre300](https://github.com/aussiealex) in Adelaide, Australia.
+
 ## Licence
 
 Apache 2.0 — see [LICENSE](LICENSE).
