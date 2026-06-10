@@ -82,11 +82,41 @@ agentmeter cost               # recent sessions with token breakdown
 agentmeter cost <session-id>  # detailed breakdown (partial ID works)
 agentmeter forecast           # monthly spend projection
 agentmeter strategy           # per-project cost analysis + advice
+agentmeter model              # model tier analysis + what-if comparison
 ```
 
 Cache intelligence is built in. Every cost view shows cache efficiency
 (how well prompt caching is working) and cache savings (dollars saved
 vs uncached).
+
+### Value Multiplier
+
+Answers the question: **"Did the agent save more than it cost?"**
+
+```
+$ agentmeter value
+
+  Value Report  (dev rate: $150/hr)
+  ────────────────────────────────────────────────────────────────────────
+  AgentMeter             cost   $21.43  value $5017.50  mult 234.1x  quality  95 (good)
+                         time    2007m  outcomes 3c 909t 12f 3l
+  LLMM                   cost   $57.06  value $10845.00  mult 190.0x  quality 100 (good)
+                         time    4338m  outcomes 8c 1880t 40f 6l
+  ────────────────────────────────────────────────────────────────────────
+  Total                  cost $ 417.15  value $37505.00  mult 89.9x  time 15002m saved
+```
+
+Each session gets:
+- **Cost** — real token spend from API rates
+- **Value** — estimated developer time saved, based on commits, tests, files changed, lint passes
+- **Multiplier** — value / cost. Anything >1x means you came out ahead
+- **Quality score** (0-100) — penalised for errors, test failures, retries, lint errors
+
+```bash
+agentmeter value                # recent sessions
+agentmeter value -p MyProject   # filter by project
+agentmeter value --rate 200     # set dev hourly rate ($150 default)
+```
 
 ### Session Coaching
 
@@ -123,6 +153,24 @@ $ agentmeter coach review -p myproject
 
 Detects 13 patterns including edit-test loops, broad exploration, repeated
 file reads, high velocity bursts, cache write waste, and low cache efficiency.
+
+### Yellow Card Coaching
+
+Real-time mid-session nudges. When your session crosses a cost threshold,
+AgentMeter blocks one tool call with a coaching message — the agent sees it,
+adjusts, and retries.
+
+```bash
+agentmeter coach start              # session-start profiling + guidance
+agentmeter coach start -t development  # set task type
+agentmeter coach context            # generate CLAUDE.md coaching block
+agentmeter coach review             # post-session efficiency analysis
+agentmeter coach show               # current thresholds
+agentmeter coach set calls 50 100   # set call thresholds
+agentmeter coach set repeat 15      # repeated tool threshold
+agentmeter coach on                 # enable yellow cards
+agentmeter coach off                # disable yellow cards
+```
 
 ### Tool Call Stats
 
@@ -227,27 +275,58 @@ Path 2: MCP Proxy (for metering MCP server traffic)
 
 ## CLI Reference
 
+Commands are grouped — run `agentmeter --help` to see them by category.
+
+**Getting Started**
+
 | Command | Description |
 |---------|-------------|
+| `agentmeter hook install <agent>` | Install hook for claude/gemini/codex/copilot |
+| `agentmeter hook status` | Check which hooks are installed |
+| `agentmeter wrap <command>` | MCP proxy mode (advanced) |
 | `agentmeter stats` | Tool call stats (today, `--week`, `--all`) |
-| `agentmeter calls` | Recent individual calls |
 | `agentmeter sessions` | Session breakdowns with outcomes |
-| `agentmeter daily` | Daily totals with bar chart |
+| `agentmeter calls` | Recent individual calls |
+
+**Cost Analysis**
+
+| Command | Description |
+|---------|-------------|
 | `agentmeter cost` | Real token costs per session |
+| `agentmeter daily` | Daily totals with bar chart and cost |
 | `agentmeter forecast` | Monthly spend projection |
-| `agentmeter strategy` | Per-project cost analysis + advice |
+| `agentmeter value` | Value multiplier — cost vs dev time saved |
+| `agentmeter model` | Model tier analysis + what-if cost comparison |
+| `agentmeter rates` | View/edit model rate card |
+
+**Intelligence**
+
+| Command | Description |
+|---------|-------------|
 | `agentmeter advise` | Cross-session spend recommendations |
-| `agentmeter coach review` | Single-session efficiency analysis |
+| `agentmeter strategy` | Per-project cost analysis + advice |
 | `agentmeter summary` | Cost context for agent injection |
-| `agentmeter dashboard` | Web dashboard |
-| `agentmeter export` | JSONL data export |
+| `agentmeter coach review` | Post-session efficiency analysis |
+| `agentmeter coach start` | Session-start profiling + guidance |
+| `agentmeter coach on/off` | Enable/disable yellow card coaching |
+
+**Governance**
+
+| Command | Description |
+|---------|-------------|
 | `agentmeter budget` | Budget rules (set/show/clear) |
 | `agentmeter breaker` | Circuit breakers (set/show/clear) |
-| `agentmeter hook` | Hook management (install/status) |
-| `agentmeter rates` | View/edit rate card |
-| `agentmeter wrap` | MCP proxy mode |
-| `agentmeter rename` | Rename a session |
+
+**Data**
+
+| Command | Description |
+|---------|-------------|
+| `agentmeter export` | JSONL data export |
 | `agentmeter backfill` | Detect outcomes in historical sessions |
+| `agentmeter rename` | Rename a session |
+| `agentmeter dashboard` | Web dashboard (6 views) |
+
+Most commands accept `-p/--project` to filter by project name.
 
 ## Requirements
 
