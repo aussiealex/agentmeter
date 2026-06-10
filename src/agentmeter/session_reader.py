@@ -165,8 +165,13 @@ def find_session_jsonl(
     if claude_dir is None:
         claude_dir = Path.home() / ".claude"
 
+    import re
+
     slug = derive_project_slug(project_dir)
     if not slug:
+        return None
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", session_id):
         return None
 
     jsonl = claude_dir / "projects" / slug / f"{session_id}.jsonl"

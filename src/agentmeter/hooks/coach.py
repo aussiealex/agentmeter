@@ -31,7 +31,9 @@ def main() -> None:
     except json.JSONDecodeError:
         return
 
-    session_id = data.get("session_id", "")
+    from agentmeter.hooks.base import _safe_session_id
+
+    session_id = _safe_session_id(data.get("session_id", ""))
     if not session_id:
         return
 

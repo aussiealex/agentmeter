@@ -8,12 +8,22 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from agentmeter.db import MeterDB
 from agentmeter.models import NormalisedToolEvent, Session, ToolCall
+
+_SAFE_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def _safe_session_id(sid: str) -> str | None:
+    """Return session_id only if it's safe for use in file paths."""
+    if sid and _SAFE_ID.match(sid):
+        return sid
+    return None
 
 
 def record_event(event: NormalisedToolEvent) -> None:
@@ -62,10 +72,14 @@ def _update_coach_state(event: NormalisedToolEvent) -> None:
     <1ms: read JSON, bump counters, write JSON. No DB queries.
     """
     try:
+        sid = _safe_session_id(event.session_id)
+        if not sid:
+            return
+
         from agentmeter.platform import data_dir
 
         coach_dir = data_dir() / "coach"
-        state_path = coach_dir / f"{event.session_id}.json"
+        state_path = coach_dir / f"{sid}.json"
 
         state: dict = {}
         if state_path.exists():
