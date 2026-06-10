@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import datetime, timedelta
 
 import click
@@ -13,11 +14,66 @@ from agentmeter.cli_hook import hook
 from agentmeter.cli_rates import rates
 from agentmeter.db import MeterDB
 
+# Command groups for help display
+_SECTIONS: OrderedDict[str, list[str]] = OrderedDict([
+    ("Getting Started", [
+        "hook", "wrap", "stats", "sessions", "calls",
+    ]),
+    ("Cost Analysis", [
+        "cost", "daily", "forecast", "value", "model", "rates",
+    ]),
+    ("Intelligence", [
+        "advise", "strategy", "summary", "coach",
+    ]),
+    ("Governance", [
+        "budget", "breaker",
+    ]),
+    ("Data", [
+        "export", "backfill", "rename", "dashboard",
+    ]),
+])
 
-@click.group()
+
+class GroupedGroup(click.Group):
+    """Click group that displays commands in labelled sections."""
+
+    def format_commands(
+        self, ctx: click.Context, formatter: click.HelpFormatter,
+    ) -> None:
+        commands = {}
+        for name in self.list_commands(ctx):
+            cmd = self.get_command(ctx, name)
+            if cmd is None or cmd.hidden:
+                continue
+            commands[name] = cmd
+
+        placed = set()
+        for section, names in _SECTIONS.items():
+            rows = []
+            for name in names:
+                if name in commands:
+                    short_help = commands[name].get_short_help_str(limit=60)
+                    rows.append((name, short_help))
+                    placed.add(name)
+            if rows:
+                with formatter.section(section):
+                    formatter.write_dl(rows)
+
+        # Any commands not in a section (safety net)
+        remaining = [
+            (name, commands[name].get_short_help_str(limit=60))
+            for name in sorted(commands)
+            if name not in placed
+        ]
+        if remaining:
+            with formatter.section("Other"):
+                formatter.write_dl(remaining)
+
+
+@click.group(cls=GroupedGroup)
 @click.version_option(package_name="agentmeter")
 def main() -> None:
-    """AgentMeter — meter every MCP tool call."""
+    """AgentMeter — Know what your agents cost."""
 
 
 main.add_command(budget)
@@ -27,7 +83,7 @@ main.add_command(rates)
 
 
 def _load_pro_commands() -> None:
-    """Register pro commands if agentmeter-pro is installed."""
+    """Register additional commands."""
     try:
         from agentmeter.cli_advise import advise
         from agentmeter.cli_coach import coach
